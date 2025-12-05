@@ -1,0 +1,13 @@
+Images have separate licenses than this repository
+
+Image                               :  Source
+/demoImages/gray.png                :  Kaelygon 2024 CC0 public domain
+/demoImages/Michelangelo_David.png  : "https://en.wikipedia.org/wiki/Dither#/media/File:Michelangelo's_David_-_63_grijswaarden.png" Public domain
+/demoImages/LPlumocrista.png        : "https://github.com/Kaelygon/Lacertocyon-plumocrista" Kaelygon CC BY-NC 4.0
+/demoImages/KaelygonLogo25.png      : "https://bsky.app/profile/kaelygon.bsky.social/post/3lbfcl7kegs2d" Kaelygon CC BY-NC 4.0
+
+Readme Images
+
+/demoImages/LPlumocrista_bayer_example.png   : Kaelygon CC BY-NC 4.0
+/demoImages/Michelangelo_David_steinberg.png  : Public domain, derivation by Kaelygon
+/demoImages/KaelygonLogo25_palettize16_example.png: Kaelygon CC BY-NC 4.0

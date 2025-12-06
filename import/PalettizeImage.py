@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from scipy.spatial import cKDTree as KDTree
 from numba import njit
 
-import sys
 import os.path
 import argparse
 
@@ -312,7 +311,7 @@ def Palettize_demo():
 			image				= input_path+"/"+"gray.png",
 			palette			= palette_path+"/"+"pal2.png",
 			output			= output_path+"/"+"p_gray.png",
-			alpha_count		= 1,
+			alpha_count		= 256,
 			max_error		= 1.0,
 			merge_radius	= 0.0,
 			dither			= 1,
@@ -365,7 +364,7 @@ def Palettize_parser(argv):
 	) 
 	parser.add_argument(
 		'-d', '--dither', type=str,
-  		default=0,
+  		default="none",
   		help="Options: none, bayer, steinberg"
 	) 
 	parser.add_argument(
@@ -391,14 +390,11 @@ def Palettize_parser(argv):
 			return None
 
 	#failures
-	example_arg_string = "python " + os.path.basename(argv[0]) + "-i [input].png -p [palette].png ... -o [output].png"
 	if args.input is None:
 		print("Must specify input image!")
-		print(example_arg_string)
 		return None
 	if args.palette is None:
 		print("Must specify palette image!")
-		print(example_arg_string)
 		return None
 
 	#Args to preset

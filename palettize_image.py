@@ -7,11 +7,12 @@ import sys
 sys.path.insert(1, './import/')
 from PalettizeImage import *
 
+#TODO: Verify alpha count 256 is in ragen [0,1]. Demo could use actual bool
 if __name__ == '__main__':
 	sys.argv
 	argv = sys.argv[:]
  
-	im_too_lazy_to_use_terminal = False
+	im_too_lazy_to_use_terminal = True
 	if im_too_lazy_to_use_terminal and len(argv)<=1:
 		lazy_arguments = [
 			"--demo",			"0", #Generate demo images

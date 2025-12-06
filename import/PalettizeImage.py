@@ -365,7 +365,7 @@ def Palettize_parser(argv):
 	) 
 	parser.add_argument(
 		'-d', '--dither', type=str,
-  		default=1,
+  		default=0,
   		help="Options: none, bayer, steinberg"
 	) 
 	parser.add_argument(

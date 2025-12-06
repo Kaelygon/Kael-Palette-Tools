@@ -11,7 +11,7 @@ if __name__ == '__main__':
 	sys.argv
 	argv = sys.argv[:]
  
-	im_too_lazy_to_use_terminal = True
+	im_too_lazy_to_use_terminal = False
 	if im_too_lazy_to_use_terminal and len(argv)<=1:
 		lazy_arguments = [
 			"--demo",			"0", #Generate demo images

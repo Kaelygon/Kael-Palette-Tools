@@ -266,6 +266,10 @@ def Palettize_preset(preset: ConvertPreset):
 		else:
 			image_ok.ditherNone(palette_ok)
 
+	output_path = os.path.dirname(preset.output)
+	if not os.path.exists(output_path):
+		os.makedirs(output_path)
+
 	image_ok.saveImage(preset.output)
 	print("Saved image "+preset.output) 
  

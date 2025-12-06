@@ -106,8 +106,11 @@ class OkImage:
 		self.pixels_output[:,:3] = quant_lab
 		
 	def quantizeAlpha(self, alpha_count: int):
+		if alpha_count == None:
+			return
+
 		alpha = self.pixels_output[:,3]
-		if alpha_count is None or alpha_count == 0:
+		if alpha_count == 0:
 			alpha = np.zeros(len(alpha)) + 1.0
 		else:
 			alpha = self._quantize(alpha,alpha_count)
@@ -239,7 +242,7 @@ def Palettize_createWeighted(
 def Palettize_preset(preset: ConvertPreset):
 	
 	palette_ok = OkImage(preset.palette)
-	palette_ok.quantizeAlpha(None)
+	palette_ok.quantizeAlpha(0)
 	palette_ok.createUniqueList()
 	pal_length = len(palette_ok.unique_list.color)
 	if pal_length < 2:
@@ -272,11 +275,13 @@ def Palettize_preset(preset: ConvertPreset):
 
 	image_ok.saveImage(preset.output)
 	print("Saved image "+preset.output) 
- 
+
+
+## Palettize Image Parser ##
 
 def Palettize_demo():
 	print("Converting demo images")
-   
+	
 	input_path = "./demoImages"
 	palette_path = "./palettes"
 	output_path = "./output"
@@ -295,7 +300,7 @@ def Palettize_demo():
 			image				= input_path+"/"+"LPlumocrista.png",
 			palette			= palette_path+"/"+"pal256.png",
 			output			= output_path+"/"+"p_LPlumocrista.png",
-			alpha_count		= 1,
+			alpha_count		= None,
 			max_error		= 0.0,
 			merge_radius	= 0.0,
 			dither			= 1,
@@ -315,11 +320,21 @@ def Palettize_demo():
 			image				= input_path+"/"+"gray.png",
 			palette			= palette_path+"/"+"pal2.png",
 			output			= output_path+"/"+"p_gray.png",
-			alpha_count		= 256,
+			alpha_count		= 1,
 			max_error		= 1.0,
 			merge_radius	= 0.0,
 			dither			= 1,
 			bayer_size		= 16,
+		),
+		ConvertPreset(
+			image				= input_path+"/"+"rgba24_color_test.png",
+			palette			= palette_path+"/"+"pal256.png",
+			output			= output_path+"/"+"p_rgba24_color_test.png",
+			alpha_count		= 16,
+			max_error		= 0.0,
+			merge_radius	= 0.0,
+			dither			= 0,
+			bayer_size		= 0,
 		)
 	]
 	
@@ -335,7 +350,7 @@ def Palettize_parser(argv):
 
 	parser = argparse.ArgumentParser(prog=argv[0],description="Palettize and dither using arbitrary palette")
  
-	#flagged
+	#all inputs arg_list are strings. Easier to convert str to X
 	parser.add_argument(
 		'-i', '--input', type=str,
   		default= None,
@@ -352,18 +367,18 @@ def Palettize_parser(argv):
 		help="Output .png path"	
 	) 
 	parser.add_argument(
-		'-a', '--alpha-count', type=int,
-		default=1,
+		'-a', '--alpha-count', type=str,
+		default="1",
   		help="Number of alpha levels"
 	) 
 	parser.add_argument(
-		'-e', '--max-error', type=float,
-		default=0.0,
+		'-e', '--max-error', type=str,
+		default="0.0",
 		help="Radius that within neighboring palette colors can replace unique colors. Works only with --dither none"
 	) 
 	parser.add_argument(
-		'-m', '--merge-radius', type=float,
-		default=0.0,
+		'-m', '--merge-radius', type=str,
+		default="0.0",
 		help="Quantize before palettization. 1.0 is roughly same number of colors as palette."
 	) 
 	parser.add_argument(
@@ -372,7 +387,7 @@ def Palettize_parser(argv):
   		help="Options: none, bayer, steinberg"
 	) 
 	parser.add_argument(
-		'-b', '--bayer-size', type=int,
+		'-b', '--bayer-size', type=str,
   		default=16,
   		help="Dither matrix size. Powers of 2 are bayer matrices. Works only with --dither bayer"
 	) 
@@ -383,59 +398,94 @@ def Palettize_parser(argv):
 		help="Generate test images"
 	)
 
-	if len(argv)<=1:
+	if len(argv)<=1: #No args
 		argv.append("--help")
-	args = parser.parse_args(argv[1:])
+	arg_list = parser.parse_args(argv[1:])
+
+	arg_list_vars = vars(arg_list).copy()
+	for arg in arg_list_vars:
+	 arg_list.arg = str(arg).lower()
+
 
 	#demo has highest priority
-	if args.demo is not None:
-		if args.demo.upper() in ["TRUE", "1"]:
-			Palettize_demo()
-			return None
+	if (arg_list.demo is not None) and (arg_list.demo in ["true", "1"]):
+		Palettize_demo()
+		return None
+
 
 	#failures
-	if args.input is None:
+	if arg_list.input is None:
 		print("Must specify input image!")
 		return None
-	if args.palette is None:
+	if arg_list.palette is None:
 		print("Must specify palette image!")
 		return None
 
-	#Args to preset
+
+	#arg_list to preset
 	d_preset = ConvertPreset(
-		image				= str(args.input),
-		palette			= str(args.palette),
-		output			= args.output,
-		alpha_count		= int(args.alpha_count),
-		max_error		= float(args.max_error),
-		merge_radius	= float(args.merge_radius),
+		image				= str(arg_list.input),
+		palette			= str(arg_list.palette),
+		output			= None,
+		alpha_count		= int(arg_list.alpha_count),
+		max_error		= float(arg_list.max_error),
+		merge_radius	= float(arg_list.merge_radius),
 		dither			= None,
-		bayer_size		= int(args.bayer_size),
+		bayer_size		= int(arg_list.bayer_size),
 	)
- 
+
+
+	#assign dither
 	dither_options = {
-		"NONE" : 0,
-		"BAYER" : 1,
-		"ORDERED" : 1,
-		"STEINBERG" : 2,
-		"FLOYD-STEINBERG" : 2,
+		"none" : 0,
+		"bayer" : 1,
+		"ordered" : 1,
+		"steinberg" : 2,
+		"floyd-steinberg" : 2,
 		"0" : 0,
 		"1" : 1,
 		"2" : 2,
 	}
- 
-	args_dither_upper = str(args.dither).upper()
-
-	if args.dither is not None and args_dither_upper in dither_options:
-		d_preset.dither = dither_options[args_dither_upper]
+	if arg_list.dither in dither_options:
+		d_preset.dither = dither_options[arg_list.dither]
 	else:
 		d_preset.dither = 0
 
-	if args.output==None:
-		f_name = os.path.basename(d_preset.image)
-		f_path = os.path.dirname(d_preset.image)
-		d_preset.output=f_path+"/"+"p_"+ f_name
-	elif d_preset.output=="./":
-		d_preset.output="./"+"p_"+os.path.basename(d_preset.image)
+
+	#assign output
+	if arg_list.input != None:
+		intput_path = os.path.dirname(arg_list.input)
+		intput_basename = os.path.basename(arg_list.input)
+	if arg_list.output != None:
+		output_path = os.path.dirname(arg_list.output)
+		output_basename = os.path.basename(arg_list.output)
   
+	if arg_list.output==None or arg_list.output=='': #same dir as source with p_ prefix
+		d_preset.output = intput_path + "/" + "p_"+ intput_basename
+  
+	elif output_basename == '': #Only output folder provided
+		d_preset.output = output_path + "/" + "p_"+ intput_basename
+
+	elif arg_list.output == "./": #current dir
+		d_preset.output = "./" + "p_" + os.path.basename(d_preset.image)
+
+	else:
+		d_preset.output = arg_list.output
+
+
+	#preset validity check
+	preset_files = [d_preset.image, d_preset.palette, d_preset.output ]
+	for file in preset_files:
+		base_dir = os.path.dirname(file)
+		err = 0
+		if not os.path.isdir(base_dir):
+			print("Directory "+base_dir+" doesn't exist.")
+			err = 1
+		if not os.access(base_dir, os.W_OK):
+			print("Can't access "+base_dir)
+			err = 1
+   
+		if err:
+			return
+
 	return d_preset

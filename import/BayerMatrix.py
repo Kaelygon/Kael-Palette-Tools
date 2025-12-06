@@ -7,8 +7,8 @@ I don't even pretend like I know how this works but LGTM
 
 def _Bayer_calcCorrelationMap(p, q, w):
 	# Corr_ = ifft2( fft2(w*p) * conj(fft2(q)) )
-	Fp = np.fft.fft2(w * p)
-	Fq = np.fft.fft2(q)
+	Fp = np.fft.fft2(p)
+	Fq = np.fft.fft2(w * q)
 	corr = np.fft.ifft2(Fp * np.conj(Fq))
 	return np.real(corr)
 
@@ -20,7 +20,7 @@ def _Bayer_calcShifts(m_l, m_a, m_b, w):
 	Corr_lb = _Bayer_calcCorrelationMap(m_l, m_b, w)
 	Corr_ab = _Bayer_calcCorrelationMap(m_a, m_b, w)
 
-	best = None
+	best = ((0,0),(0,0),(0,0))
 	best_obj = np.inf
 	#Shifts are relative to s_L = (0,0)
 	for ay in range(H):
@@ -44,9 +44,9 @@ def _Bayer_calcShifts(m_l, m_a, m_b, w):
 	return best
 
 def _Bayer_calcTileWeights(pixel_gaps, y_idxs, x_idxs, b_h, b_w):
-    w = np.zeros((b_h, b_w), dtype=np.float64)
-    np.add.at(w, (y_idxs % b_h, x_idxs % b_w), pixel_gaps)
-    return w
+	 w = np.zeros((b_h, b_w), dtype=np.float64)
+	 np.add.at(w, (y_idxs % b_h, x_idxs % b_w), pixel_gaps)
+	 return w
 
 
 #Return NxN bayer matrix. Non powers of 2 are bayer-like. n<1 is invalid 
@@ -69,29 +69,32 @@ def Bayer_createMatrix(n: int):
 #calculated from three staggered Bayer matrices of same size that minimize interference when layered
 def Bayer_calcPixelThresholds(matrix_size, pixel_gaps, image_width):
 
-   #bayer matrix thresholds
-   b_m=Bayer_createMatrix(int(matrix_size))
-   b_h, b_w = b_m.shape
-   b_m = b_m / (np.max(b_m))-0.5 #normalize [-0.5,0.5]
-   b_m = b_m*(1-(2e-6)) #theshold extremes (-0.5+eps,0.5-eps)
+	#bayer matrix thresholds
+	b_m=Bayer_createMatrix(int(matrix_size))
+	b_h, b_w = b_m.shape
+	max_cell = np.max(b_m)
+	if max_cell == 0: #avoid div by 0
+		b_m = b_m*0.0
+	else:
+		b_m = b_m / max_cell - 0.5 #normalize [-0.5,0.5]
+	b_m = b_m*(1-(2e-6)) #theshold extremes (-0.5+eps,0.5-eps)
 
-   y_idxs, x_idxs = np.divmod(np.arange(len(pixel_gaps)), image_width)
-   thresholds = b_m[y_idxs % b_h, x_idxs % b_w]
+	y_idxs, x_idxs = np.divmod(np.arange(len(pixel_gaps)), image_width)
 
-   #Stagger matrices to reduce channel interference
-   m_l = b_m
-   m_a = np.rot90(m_l)
-   m_b = np.flipud(m_a)
+	#Stagger matrices to reduce channel interference
+	m_l = b_m
+	m_a = np.rot90(m_l)
+	m_b = np.flipud(m_a)
 
-   w = _Bayer_calcTileWeights(pixel_gaps, y_idxs, x_idxs, b_h, b_w)
-   s_l, s_a, s_b = _Bayer_calcShifts(m_l, m_a, m_b, w)
+	w = _Bayer_calcTileWeights(pixel_gaps, y_idxs, x_idxs, b_h, b_w)
+	s_l, s_a, s_b = _Bayer_calcShifts(m_l, m_a, m_b, w)
 
-   m_l = np.roll(m_l, shift=s_l, axis=(0,1))
-   m_a = np.roll(m_a, shift=s_a, axis=(0,1))
-   m_b = np.roll(m_b, shift=s_b, axis=(0,1))
+	m_l = np.roll(m_l, shift=s_l, axis=(0,1))
+	m_a = np.roll(m_a, shift=s_a, axis=(0,1))
+	m_b = np.roll(m_b, shift=s_b, axis=(0,1))
 
-   m_l = m_l[y_idxs % b_h, x_idxs % b_w]
-   m_a = m_a[y_idxs % b_h, x_idxs % b_w]
-   m_b = m_b[y_idxs % b_h, x_idxs % b_w]
-   
-   return m_l, m_a, m_b
+	m_l = m_l[y_idxs % b_h, x_idxs % b_w]
+	m_a = m_a[y_idxs % b_h, x_idxs % b_w]
+	m_b = m_b[y_idxs % b_h, x_idxs % b_w]
+	
+	return m_l, m_a, m_b

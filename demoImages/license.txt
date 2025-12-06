@@ -5,6 +5,7 @@ Image                               :  Source
 /demoImages/Michelangelo_David.png  : "https://en.wikipedia.org/wiki/Dither#/media/File:Michelangelo's_David_-_63_grijswaarden.png" Public domain
 /demoImages/LPlumocrista.png        : "https://github.com/Kaelygon/Lacertocyon-plumocrista" Kaelygon CC BY-NC 4.0
 /demoImages/KaelygonLogo25.png      : "https://bsky.app/profile/kaelygon.bsky.social/post/3lbfcl7kegs2d" Kaelygon CC BY-NC 4.0
+/demoImages/rgba24_color_test.png   : "https://commons.wikimedia.org/wiki/File:RGB_24bits_palette_color_test_chart.png" Public domain  Ricardo Cancho Niemietz, derived by Kaelygon
 
 Readme Images
 

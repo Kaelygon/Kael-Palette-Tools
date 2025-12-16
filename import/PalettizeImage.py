@@ -37,6 +37,7 @@ class ConvertPreset:
 	merge_radius: float #quantize original image. >1.0 is lower quant than palette. May improve quality and performance if you got thousands of unique colors and tiny palette
 	dither: int #0=None 1=ordered 2=Floyd–Steinberg(very slow)
 	bayer_size: int #bayer matrix size. Only powers of two will produce proper bayer matrices
+	bayer_weight: float #Scale threshold by 0.0 = palette channel gaps, 0.0-1.0 palette gap norm * quantized error, 1.0-2.0 bias gap norm
 
 #### Image conversion ###
 
@@ -165,16 +166,32 @@ class OkImage:
 		self.pixels_output[:,:3] = pal_list.color[:,:3][idxs]
 
 	#https://bisqwit.iki.fi/story/howto/dither/jy/
-	def ditherOrdered(self, palette_img,  matrix_size=16):  
+	def ditherOrdered(self, palette_img, matrix_size=16, gap_weight=1.0): 
+
 		pal_list = palette_img.unique_list  
 		pixels = self.pixels_output[:,:3].copy()
 		
 		pal_tree = pal_list.getUniqueTree()
   
-		#Nearest 2 palette colors to current pixel
-		dists, idxs = pal_tree.query(pixels, k=2) 
-		palette_gaps = np.abs(pal_list.color[idxs[:,1]] - pal_list.color[idxs[:,0]]) #per channel gaps	
-		palette_gaps = np.linalg.norm(palette_gaps,axis=1)[:,None]*[1,1,1] #smoothest and best colors but over dithers with some palettes 
+		#Channel gaps of nearest 2 palette colors to current pixel
+		pal_dists, idxs = pal_tree.query(pixels, k=2) 
+		palette_gaps = np.abs(pal_list.color[idxs[:,1]] - pal_list.color[idxs[:,0]])
+
+		#scale by gap norm weighted by distance
+		if gap_weight!=0.0:
+			# vec_b -> vec_a : fac(0 -> 1)
+			def np_lerp(vec_a, vec_b, fac):
+				return vec_a * (1.0-fac) + vec_b * fac
+
+			palette_gaps_norm = np.linalg.norm(palette_gaps,axis=1)[:,None]*[1,1,1] #smoothest and best colors but over-dithers with some palettes 
+
+			#limit over-dither
+			max_pal_dist = np.max(pal_dists[:,0])
+			gater = pal_dists[:,0]/max_pal_dist
+			gater = gater + max(0.0, gap_weight - 1.0) #1.0-2.0 raises minimum
+			gater = np.clip(gater*gap_weight, 0.0, 1.0)
+
+			palette_gaps = np_lerp(palette_gaps, palette_gaps_norm, gater[:,None]*[1,1,1]) 
   
 		y_idxs, x_idxs = np.divmod(np.arange(palette_gaps.shape[0]), self.width)
 
@@ -282,7 +299,7 @@ def Palettize_preset(preset: ConvertPreset):
 
 	#replace original img pixels with convert_dict
 	if preset.dither == "bayer":
-		image_ok.ditherOrdered(palette_ok,preset.bayer_size)
+		image_ok.ditherOrdered(palette_ok, preset.bayer_size, preset.bayer_weight)
 
 	elif preset.dither == "steinberg":
 		image_ok.ditherFloydSteinberg(palette_ok)
@@ -324,8 +341,9 @@ def Palettize_demo():
 			alpha_count		= 1,
 			max_error		= 2.0,
 			merge_radius	= 0.0,
-			dither			= 0,
+			dither			= "none",
 			bayer_size		= 0,
+			bayer_weight	= 1.0,
 		),
 		ConvertPreset(
 			image				= input_path+"/"+"LPlumocrista.png",
@@ -334,8 +352,9 @@ def Palettize_demo():
 			alpha_count		= None,
 			max_error		= 0.0,
 			merge_radius	= 0.0,
-			dither			= 1,
+			dither			= "bayer",
 			bayer_size		= 16,
+			bayer_weight	= 1.0,
 		),
 		ConvertPreset(
 			image				= input_path+"/"+"Michelangelo_David.png",
@@ -344,8 +363,9 @@ def Palettize_demo():
 			alpha_count		= 1,
 			max_error		= 1.0,
 			merge_radius	= 0.1,
-			dither			= 0,
+			dither			= "steinberg",
 			bayer_size		= 0,
+			bayer_weight	= 1.0,
 		),
 		ConvertPreset(
 			image				= input_path+"/"+"gray.png",
@@ -354,8 +374,9 @@ def Palettize_demo():
 			alpha_count		= 1,
 			max_error		= 1.0,
 			merge_radius	= 0.0,
-			dither			= 1,
+			dither			= "bayer",
 			bayer_size		= 16,
+			bayer_weight	= 1.0,
 		),
 		ConvertPreset(
 			image				= input_path+"/"+"rgba24_color_test.png",
@@ -364,8 +385,9 @@ def Palettize_demo():
 			alpha_count		= 16,
 			max_error		= 0.0,
 			merge_radius	= 0.0,
-			dither			= 0,
+			dither			= "none",
 			bayer_size		= 0,
+			bayer_weight	= 1.0,
 		)
 	]
 	
@@ -423,6 +445,11 @@ def Palettize_parser(argv):
 		help="Dither matrix size. Powers of 2 are bayer matrices. Works only with --dither bayer"
 	) 
 	parser.add_argument(
+		'-B', '--bayer-weight', type=str,
+		default=16,
+		help="Scale threshold by : 0.0 = palette channel gaps, 0.0-1.0 palette gap norm * quantized error, 1.0-2.0 bias palette gap norm"
+	) 
+	parser.add_argument(
 		'-D', '--demo',  type=str,
 		default="False", 
 		dest='demo', 
@@ -444,15 +471,6 @@ def Palettize_parser(argv):
 		return None
 
 
-	#failures
-	if arg_list.input is None:
-		print("Must specify input image!")
-		err = 1
-	if arg_list.palette is None:
-		print("Must specify palette image!")
-		err = 1
-
-
 	#arg_list to preset
 	d_preset = ConvertPreset(
 		image				= str(arg_list.input),
@@ -463,10 +481,10 @@ def Palettize_parser(argv):
 		merge_radius	= float(arg_list.merge_radius),
 		dither			= None,
 		bayer_size		= int(arg_list.bayer_size),
+		bayer_weight	= float(arg_list.bayer_weight),
 	)
 
 
-	#assign dither
 	#assign dither
 	if arg_list.dither in ConvertPreset.DITHER_METHOD:
 		method_index = ConvertPreset.DITHER_METHOD[arg_list.dither]
@@ -521,6 +539,6 @@ def Palettize_parser(argv):
 
 	if preset_fail:
 		print("Failed to parse arguments. Exiting...")
-		return
+		return None
 
 	return d_preset

@@ -36,13 +36,12 @@ def Bayer_createMatrix(n: int, m: int=1):
 	chosen_slices = np.clip(np.arange(m), 0, n-1)
 	b_m_slices = b_m[:, :, chosen_slices]
  
-	arr_ranks = b_m_slices
 	arr_ranks = np.empty_like(b_m_slices)
 	for c in range(m):
 		slice_flat = b_m_slices[:, :, c].ravel()
 		order = np.argsort(slice_flat)
 		ranks = np.empty_like(slice_flat)
-		ranks[order] = np.arange(1, slice_flat.size + 1)
+		ranks[order] = np.arange(0, slice_flat.size)
 		arr_ranks[:, :, c] = ranks.reshape(n, n)
 
 	return arr_ranks

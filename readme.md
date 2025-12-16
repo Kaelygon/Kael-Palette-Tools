@@ -16,7 +16,7 @@ The image files in "./demoImages" have their own respective licenses. See "./dem
 ### palettize_image.py
 *Palettize and dither using arbitrary palette*
 ```
-python palettize_image.py [-h] [-i INPUT] [-p PALETTE] [-o OUTPUT] [-a ALPHA_COUNT] [-e MAX_ERROR] [-m MERGE_RADIUS] [-d DITHER] [-b BAYER_SIZE] [-D DEMO] [_output]
+python palettize_image.py [-h] [-i INPUT] [-p PALETTE] [-o OUTPUT] [-a ALPHA_COUNT] [-e MAX_ERROR] [-m MERGE_RADIUS] [-d DITHER] [-b BAYER_SIZE] [-B BAYER_WEIGHT] [-D DEMO]
 ```
 The only proper tool.
 
@@ -38,7 +38,7 @@ Options:
 -b, --bayer-size    (int  ) Bayer matrix size. <1 is invalid. Only powers of 2s are proper Bayer matrices. Anything beyond 16 makes little difference 
 -e, --max-error     (float) Higher will allow farther colros to replace unique colors. 1.0-1.5 is roughly 12 nearest neighbors in uniform palette. Preserves detail but causes banding at high levels. 1.0-2.0 is good for pixel art.
 -m, --merge-radius  (float) Quantize before palettizing. 1.0 will result roughly in same number of colors as palette, but loses information. Reduces unique colors, so 0.01 to 0.2 is good value for high depth images. May improve performance and palettization.
--B, --bayer-weight BAYER_WEIGHT (float) Scale threshold by 
+-B, --bayer-weight  (float) Scale threshold by 
    0.0 palette channel gaps 
    0.0-1.0 palette gap norm * quantized error 
    1.0-2.0 bias palette gap norm

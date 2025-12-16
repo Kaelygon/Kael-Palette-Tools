@@ -34,7 +34,7 @@ Options:
 -o, --output        (str  ) Path to output .png
 
 -a, --alpha-count   (int  ) How many alpha levels
--d, --dither        (int  ) Dither type. Options: none, bayer, steinberg
+-d, --dither        (str  ) Dither type. Options: none, bayer, steinberg
 -b, --bayer-size    (int  ) Bayer matrix size. <1 is invalid. Only powers of 2s are proper Bayer matrices. Anything beyond 16 makes little difference 
 -e, --max-error     (float) Higher will allow farther colros to replace unique colors. 1.0-1.5 is roughly 12 nearest neighbors in uniform palette. Preserves detail but causes banding at high levels. 1.0-2.0 is good for pixel art.
 -m, --merge-radius  (float) Quantize before palettizing. 1.0 will result roughly in same number of colors as palette, but loses information. Reduces unique colors, so 0.01 to 0.2 is good value for high depth images. May improve performance and palettization.

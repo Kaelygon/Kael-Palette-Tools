@@ -14,6 +14,21 @@ from oklabConversion import *
 
 @dataclass
 class ConvertPreset:
+	DITHER_METHOD = {
+		"none" : 0,
+		"bayer" : 1,
+		"steinberg" : 2,
+		"floyd-steinberg" : 2,
+		"0" : 0,
+		"1" : 1,
+		"2" : 2,
+	}
+	DITHER_METHOD_KEYS = [
+		"none",
+		"bayer",
+		"steinberg",
+	]
+
 	image: str #file names
 	palette: str
 	output: str
@@ -57,7 +72,7 @@ class UniqueList:
 	color: np.ndarray #uniques only
 	alpha: np.ndarray
 	area: np.ndarray
- 
+
 	unique_idxs: np.ndarray
 	original_idxs: np.ndarray #colors_with_dupes = color[original_idxs]
 	tree: KDTree = None
@@ -70,10 +85,10 @@ class UniqueList:
 class OkImage:
 	pixels = None #don't mutate after init
 	pixels_output = None #copy of pixels that can be modified
- 
+
 	height = None
 	width = None
- 
+
 	def __init__(self, input_path):
 		self.imgToOkPixels(input_path)
 
@@ -88,7 +103,7 @@ class OkImage:
 		col_list = col_list.reshape(-1, 4)
 		col_list[:,:3] = srgbToOklab(col_list[:,:3])
 		col_list[:,:3] = self._quantize(col_list[:,:3], int(1.0/OKLAB_8BIT_MARGIN))
-  
+
 		self.pixels = col_list
 		self.pixels_output = self.pixels.copy()
 		self.width, self.height = in_img.size
@@ -119,19 +134,19 @@ class OkImage:
 	def createUniqueList(self):
 		#strip dupes
 		unique_colors, unique_idxs, original_idxs = np.unique(self.pixels_output, axis=0, return_index=True, return_inverse=True)
- 
+
 		#area[original_index] = dupe_count, so area[0] is how many pixels are unique_color[0]
 		nontransp = self.pixels_output[:, 3] > (1.0 / 255.0) #exclude transparent
 		area = np.bincount( 
-	  		original_idxs, 
-		 	weights=nontransp, 
-		  	minlength=len(unique_colors)
+			original_idxs, 
+			weights=nontransp, 
+			minlength=len(unique_colors)
 		)
-  
+
 		self.unique_list = UniqueList(
 			unique_colors[:,:3], 
 			unique_colors[:, 3], 
-	  		area,
+			area,
 			unique_idxs,
 			original_idxs
 		)
@@ -140,36 +155,44 @@ class OkImage:
 	#### palettize methods ###
 	def applyPalette(self, unique_palettized):
 		self.pixels_output[:,:3] = unique_palettized[self.unique_list.original_idxs]
-  
+
 	def ditherNone(self, palette_img):
 		pal_list = palette_img.unique_list
 		pixels = self.pixels_output[:,:3]
-  
+
 		pal_tree = pal_list.getUniqueTree()
 		_, idxs = pal_tree.query(pixels, k=1)
 		self.pixels_output[:,:3] = pal_list.color[:,:3][idxs]
-  
-  
-	def ditherOrdered(self, palette_img, matrix_size=16):
-		pal_list = palette_img.unique_list
+
+	#https://bisqwit.iki.fi/story/howto/dither/jy/
+	def ditherOrdered(self, palette_img,  matrix_size=16):  
+		pal_list = palette_img.unique_list  
 		pixels = self.pixels_output[:,:3].copy()
 		
-		#per axis pixel gap
 		pal_tree = pal_list.getUniqueTree()
-		_, idxs = pal_tree.query(pixels, k=2)
-		pixel_gaps = pal_list.color[idxs[:,1]] - pal_list.color[idxs[:,0]] #per axis
-		pixel_gaps = np.linalg.norm(pixel_gaps,axis=1)
+  
+		#Nearest 2 palette colors to current pixel
+		dists, idxs = pal_tree.query(pixels, k=2) 
+		palette_gaps = np.abs(pal_list.color[idxs[:,1]] - pal_list.color[idxs[:,0]]) #per channel gaps	
+		palette_gaps = np.linalg.norm(palette_gaps,axis=1)[:,None]*[1,1,1] #smoothest and best colors but over dithers with some palettes 
+  
+		y_idxs, x_idxs = np.divmod(np.arange(palette_gaps.shape[0]), self.width)
 
-		#Each channel uses same but differently staggered bayer matrix
-		pixel_thresholds = Bayer_calcPixelThresholds(matrix_size, pixel_gaps, self.width)
+		m_l, m_a, m_b = Ordered_bayerOkLab(matrix_size)
 
-		thresholds_stack = np.stack(pixel_thresholds, axis=1)
-		new_pixels = pixels + thresholds_stack * pixel_gaps[:, None] 
+		t_y_idxs = y_idxs % m_l.shape[0]
+		t_x_idxs = x_idxs % m_l.shape[1]
+		t_l = m_l[t_y_idxs, t_x_idxs]
+		t_a = m_a[t_y_idxs, t_x_idxs]
+		t_b = m_b[t_y_idxs, t_x_idxs]
+
+		thresholds_stack = np.stack((t_l, t_a, t_b), axis=1)
+		new_pixels = pixels + thresholds_stack * palette_gaps
 
 		pal_tree = pal_list.getUniqueTree()
 		_, idxs = pal_tree.query(new_pixels, k=1)
 		new_pixels = pal_list.color[idxs]
-  
+
 		self.pixels_output[:,:3] = new_pixels
 
 
@@ -201,7 +224,7 @@ def Palettize_createWeighted(
 	pal_length = len(palette_list.color)
 
 	max_radius = approxOkGap(pal_length) * max_error
- 
+
 	#accumulated area of colors in each palette bucket
 	bucket_areas = np.zeros(pal_length)
 
@@ -210,7 +233,7 @@ def Palettize_createWeighted(
 	est_maxk = max_error * 12 #Sphere kissing number within 1 radius
 	k_count = max(2, min(pal_length,est_maxk) )
 	dists, idxs = pal_tree.query(unique_list.color, k = int(k_count))
-  	
+	
 	#choose palette index for each color
 	unique_count = len(unique_list.color)
 	unique_palettized = np.zeros((unique_count,3))
@@ -233,7 +256,7 @@ def Palettize_createWeighted(
 	
 		unique_palettized[i] = palette_list.color[best_j]
 		bucket_areas[best_j] += unique_list.area[i]
-  
+
 	return unique_palettized
 	
 
@@ -248,7 +271,7 @@ def Palettize_preset(preset: ConvertPreset):
 	if pal_length < 2:
 		print("At least 2 palette colors needed.")
 		return
- 
+
 	image_ok = OkImage(preset.image)
 	if preset.merge_radius:
 		axis_step_size = approxOkGap(pal_length) * preset.merge_radius
@@ -258,16 +281,24 @@ def Palettize_preset(preset: ConvertPreset):
 	image_ok.createUniqueList()
 
 	#replace original img pixels with convert_dict
-	if preset.dither == 1:
+	if preset.dither == "bayer":
 		image_ok.ditherOrdered(palette_ok,preset.bayer_size)
-	elif preset.dither == 2:
+
+	elif preset.dither == "steinberg":
 		image_ok.ditherFloydSteinberg(palette_ok)
-	else: #0
+
+	elif preset.dither == "none":
 		if preset.max_error:
+			#choose closest within max_error weighted by area
 			unique_palettized = Palettize_createWeighted(image_ok, palette_ok, preset.max_error)
 			image_ok.applyPalette(unique_palettized)
 		else:
+			#choose closest to palette
 			image_ok.ditherNone(palette_ok)
+	
+	else:
+		print("Somehow dither method went missing.")
+		exit(-1)
 
 	output_path = os.path.dirname(preset.output)
 	if not os.path.exists(output_path):
@@ -340,7 +371,7 @@ def Palettize_demo():
 	
 	if not os.path.exists(output_path):
 		os.makedirs(output_path)
- 
+
 	for preset in demo_preset_list:
 		Palettize_preset( preset )
 
@@ -349,16 +380,16 @@ def Palettize_demo():
 def Palettize_parser(argv):
 
 	parser = argparse.ArgumentParser(prog=argv[0],description="Palettize and dither using arbitrary palette")
- 
+
 	#all inputs arg_list are strings. Easier to convert str to X
 	parser.add_argument(
 		'-i', '--input', type=str,
-  		default= None,
+		default= None,
 		help="input .png path"	
 	)
 	parser.add_argument(
 		'-p', '--palette', type=str,
-  		default= None,
+		default= None,
 		help="Palette .png path"	 
 	) 
 	parser.add_argument(
@@ -369,7 +400,7 @@ def Palettize_parser(argv):
 	parser.add_argument(
 		'-a', '--alpha-count', type=str,
 		default="1",
-  		help="Number of alpha levels"
+		help="Number of alpha levels"
 	) 
 	parser.add_argument(
 		'-e', '--max-error', type=str,
@@ -383,16 +414,16 @@ def Palettize_parser(argv):
 	) 
 	parser.add_argument(
 		'-d', '--dither', type=str,
-  		default="none",
-  		help="Options: none, bayer, steinberg"
+		default="none",
+		help="Options: none, bayer, steinberg"
 	) 
 	parser.add_argument(
 		'-b', '--bayer-size', type=str,
-  		default=16,
-  		help="Dither matrix size. Powers of 2 are bayer matrices. Works only with --dither bayer"
+		default=16,
+		help="Dither matrix size. Powers of 2 are bayer matrices. Works only with --dither bayer"
 	) 
 	parser.add_argument(
-	 	'-D', '--demo',  type=str,
+		'-D', '--demo',  type=str,
 		default="False", 
 		dest='demo', 
 		help="Generate test images"
@@ -404,7 +435,7 @@ def Palettize_parser(argv):
 
 	arg_list_vars = vars(arg_list).copy()
 	for arg in arg_list_vars:
-	 arg_list.arg = str(arg).lower()
+		arg_list.arg = str(arg).lower()
 
 
 	#demo has highest priority
@@ -416,10 +447,10 @@ def Palettize_parser(argv):
 	#failures
 	if arg_list.input is None:
 		print("Must specify input image!")
-		return None
+		err = 1
 	if arg_list.palette is None:
 		print("Must specify palette image!")
-		return None
+		err = 1
 
 
 	#arg_list to preset
@@ -436,20 +467,14 @@ def Palettize_parser(argv):
 
 
 	#assign dither
-	dither_options = {
-		"none" : 0,
-		"bayer" : 1,
-		"ordered" : 1,
-		"steinberg" : 2,
-		"floyd-steinberg" : 2,
-		"0" : 0,
-		"1" : 1,
-		"2" : 2,
-	}
-	if arg_list.dither in dither_options:
-		d_preset.dither = dither_options[arg_list.dither]
+	#assign dither
+	if arg_list.dither in ConvertPreset.DITHER_METHOD:
+		method_index = ConvertPreset.DITHER_METHOD[arg_list.dither]
+		d_preset.dither = ConvertPreset.DITHER_METHOD_KEYS[ method_index ]
 	else:
-		d_preset.dither = 0
+		print("Invalid dither method " + str(d_preset.dither))
+		print("Defaulting to \"none\"")
+		d_preset.dither = "none"
 
 
 	#assign output
@@ -459,14 +484,17 @@ def Palettize_parser(argv):
 	if arg_list.output != None:
 		output_path = os.path.dirname(arg_list.output)
 		output_basename = os.path.basename(arg_list.output)
-  
-	if arg_list.output==None or arg_list.output=='': #same dir as source with p_ prefix
+
+	if arg_list.output==None or arg_list.output=='': 
+		#same dir as source with p_ prefix
 		d_preset.output = intput_path + "/" + "p_"+ intput_basename
-  
-	elif output_basename == '': #Only output folder provided
+
+	elif output_basename == '': 
+		#Only output folder provided
 		d_preset.output = output_path + "/" + "p_"+ intput_basename
 
-	elif arg_list.output == "./": #current dir
+	elif arg_list.output == "./": 
+		#current dir
 		d_preset.output = "./" + "p_" + os.path.basename(d_preset.image)
 
 	else:
@@ -474,18 +502,25 @@ def Palettize_parser(argv):
 
 
 	#preset validity check
+	preset_fail = 0
+	input_files = [d_preset.image, d_preset.palette ]
 	preset_files = [d_preset.image, d_preset.palette, d_preset.output ]
 	for file in preset_files:
 		base_dir = os.path.dirname(file)
-		err = 0
 		if not os.path.isdir(base_dir):
 			print("Directory "+base_dir+" doesn't exist.")
-			err = 1
+			preset_fail = 1
 		if not os.access(base_dir, os.W_OK):
 			print("Can't access "+base_dir)
-			err = 1
+			preset_fail = 1
    
-		if err:
-			return
+	for file in input_files:
+		if not os.path.exists(file):
+			print("File doesn't exist "+file)
+			preset_fail = 1
+
+	if preset_fail:
+		print("Failed to parse arguments. Exiting...")
+		return
 
 	return d_preset

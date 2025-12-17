@@ -11,7 +11,7 @@ To avoid misattribution in subsequent releases, you must either change or remove
 The image files in "./demoImages" have their own respective licenses. See "./demoImages/license.txt"
 
 ## What does this try to solve?
-I wanted to find peceptually uniform palette, with exactly N colors.  
+I wanted to find perceptually uniform palette, with exactly N colors.  
 Hence I created **palette_generator.py**, which generates N random points and spreads them using physics simulation constrained to OKLab gamut.
 
 Then I wanted to palettize images limited to these colors, but I found ffmpeg insufficient.  

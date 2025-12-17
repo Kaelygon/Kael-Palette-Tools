@@ -232,9 +232,12 @@ def Palettize_createWeighted(
 	k_count = 13
 ):
 	def calcBucketScore(bucket_areas, col_dists, col_idxs, max_radius):
-		area_weight = max(8.0,4.0*max_radius)
+		#lower=better, col dists<1.0, bucket_fullness [0,1]
+		area_weight = 10.0 #Arbitrary, bias filled buckets to score worse
+		area_weight = max(area_weight,5.0*max_radius) #Allows high max-error to still have an effect
 		max_bucket = max(1.0, np.max(bucket_areas))
-		return col_dists * (1.0 + area_weight * (bucket_areas[col_idxs]/max_bucket) )
+		area_score = np.maximum(area_weight * bucket_areas[col_idxs]/max_bucket, 1.0)
+		return col_dists * area_score
 
 	unique_list = src_img.unique_list
 	palette_list = palette_img.unique_list
@@ -247,7 +250,7 @@ def Palettize_createWeighted(
 
 	#Closest palette colors
 	pal_tree = palette_list.getUniqueTree()
-	est_maxk = max_error * 12 #Sphere kissing number within 1 radius
+	est_maxk = 0.74*(1.0+max_error)**3 + 1.0 #How many palette colors within max_error
 	k_count = max(2, min(pal_length,est_maxk) )
 	dists, idxs = pal_tree.query(unique_list.color, k = int(k_count))
 	

@@ -10,6 +10,17 @@ To avoid misattribution in subsequent releases, you must either change or remove
 ### Other images
 The image files in "./demoImages" have their own respective licenses. See "./demoImages/license.txt"
 
+## What does this try to solve?
+I wanted to find peceptually uniform palette, with exactly N colors.  
+Hence I created **palette_generator.py**, which generates N random points and spreads them using physics simulation constrained to OKLab gamut.
+
+Then I wanted to palettize images limited to these colors, but I found ffmpeg insufficient.  
+Hence I created **palettize_image.py**  
+Here's some issues that I faced using ffmpeg as palettizer:
+- ffmpeg collapses similar colors: In pixel art you want to preserve detail, even if it means using a wrong color. Ffmpeg naively chooses nearest color so detail is lost. That's why *--dither=none* has option *--max-error*, which allows you to set a range that unused palette colors can replace similar colors.
+- ffmpeg bayer dither is unsuitable for irregular palettes: I wanted the "bayer-look" but ffmpeg is optimized for 256 color palettes in RGB, so I came up with the current ridiculous solution. It is rather complex, but still much faster than steinberg and visually pleasing.
+
+~ Kaelygon
 
 ## Palette tools
 

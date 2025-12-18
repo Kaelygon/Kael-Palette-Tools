@@ -221,7 +221,38 @@ class OkImage:
 
 		self.pixels_output[...,:3] = pixels
 
+	def printImgError(self):
+		quant_delta = self.pixels_output - self.pixels
+		dl = quant_delta[:,0]
+		da = quant_delta[:,1]
+		db = quant_delta[:,2]
+		dalpha = quant_delta[:,3]
+  
+		#_rmsq = root mean square
+		lum_rmsq 	= np.sqrt( np.mean(dl**2) )
+		chroma_rmsq= np.sqrt( np.mean(da**2+db**2) )
+		#alpha_rmsq = np.sqrt( np.mean(dalpha**2) )
+		total_rmsq = np.sqrt( np.mean(dl**2 + da**2 + db**2) )
 
+		print("[L,chroma] rmsq: " + 
+			str(round(lum_rmsq,4)) + ", " + 
+			str(round(chroma_rmsq,4))
+		)
+		#print("Alpha rmsq: " + str(round(alpha_rmsq,4)) + ", " )
+		print("Total rmsq: " 	+ str(round(total_rmsq	,8)))
+
+		lum_bias = np.mean(dl)
+		a_bias = np.mean(da)
+		b_bias = np.mean(db)
+		alpha_bias = np.mean(dalpha)
+		total_bias = np.linalg.norm( np.mean( quant_delta[:,:3] ) ) #vector length of mean delta
+		print("[L,a,b] bias: " + 
+			str(round(lum_bias,4)) + ", " + 
+			str(round(a_bias,4)) + ", " + 
+			str(round(b_bias,4))
+		)
+		print("Alpha bias: " + str(round(alpha_bias,4)) + ", " )
+		print("Total bias: " + str(round(total_bias,8)))
 
 #Map unique colors to palette, but avoid collapsing similar colors
 #Return unique_palettized[len(unique_list.color)] = [l,a,b,alpha]
@@ -326,6 +357,9 @@ def Palettize_preset(preset: ConvertPreset):
 
 	image_ok.saveImage(preset.output)
 	print("Saved image "+preset.output) 
+
+	print("\nColor error")
+	image_ok.printImgError()
 
 
 ## Palettize Image Parser ##

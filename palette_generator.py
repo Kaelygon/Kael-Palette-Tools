@@ -27,7 +27,7 @@ def run_PaletteGenerator(active_preset, palette_file, histogram_file):
 if __name__ == '__main__':
 	preset_pal64 = PalettePreset(
 			sample_method=2,
-			reserve_transparent=0,
+			reserve_transparent=1,
 			hex_pre_colors = None, #[["abcdef",True],["abc123ff",False]],
 			img_pre_colors = None,#"./data/pre_palette.png",
 			img_fixed_mask = None, #"./data/pre_palette_mask.png",

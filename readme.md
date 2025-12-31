@@ -1,7 +1,7 @@
-[comment]: <> (Remember to change '/testing/' to '/main/' when mergin to main)
-<img src="https://raw.githubusercontent.com/Kaelygon/Kael-Palette-Tools/refs/heads/testing/demoImages/Michelangelo_David_steinberg.png" alt="Steinberg example" width="180"/>
-<img src="https://raw.githubusercontent.com/Kaelygon/Kael-Palette-Tools/refs/heads/testing/demoImages/LPlumocrista_dither_variants.png" alt="Bayer example" width="256"/>
-<img src="https://raw.githubusercontent.com/Kaelygon/Kael-Palette-Tools/refs/heads/testing/demoImages/KaelygonLogo25_palettize16_example.png" alt="Palettize all 12 colors using pal16" width="256"/>
+[comment]: <> (Remember to change '/testing/' to '/main/' when mergin to main)  
+<img src="https://raw.githubusercontent.com/Kaelygon/Kael-Palette-Tools/refs/heads/testing/demoImages/Michelangelo_David_steinberg.png" alt="Steinberg example" width="180"/>  
+<img src="https://raw.githubusercontent.com/Kaelygon/Kael-Palette-Tools/refs/heads/testing/demoImages/LPlumocrista_dither_variants.png" alt="Bayer example" width="256"/>  
+<img src="https://raw.githubusercontent.com/Kaelygon/Kael-Palette-Tools/refs/heads/testing/demoImages/KaelygonLogo25_palettize16_example.png" alt="Palettize all 12 colors using pal16" width="256"/>  
 
 ## Multi-license
 The python scripts, palettes in "./palettes" are released into the public domain under the license [CC0 1.0 Universal (Kaelygon 2025)](https://creativecommons.org/public-domain/cc0/).

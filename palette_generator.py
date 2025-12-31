@@ -29,11 +29,11 @@ if __name__ == '__main__':
 			sample_method=2,
 			reserve_transparent=1,
 			hex_pre_colors = None, #[["abcdef",True],["abc123ff",False]],
-			img_pre_colors = None,#"./data/pre_palette.png",
-			img_fixed_mask = None, #"./data/pre_palette_mask.png",
+			img_pre_colors = "output/pal64-base.png",#"./data/pre_palette.png",
+			img_fixed_mask = "output/pal64-fixed.png", #"./data/pre_palette_mask.png",
 
-			gray_count	=6, 
-			max_colors	=64, 
+			gray_count	=15, 
+			max_colors	=256, 
 			hue_count	=12,
 			min_sat		=0.0, 
 			max_sat		=1.0, 
@@ -42,7 +42,7 @@ if __name__ == '__main__':
 		
 			packing_fac	=1.2,
 			max_attempts=1024*32,
-			relax_count =256,
+			relax_count =512,
 			seed=0
 		)
 

@@ -19,11 +19,11 @@ if __name__ == '__main__':
 			"--input", 			"./demoImages/LPlumocrista.png",
 			"--palette", 		"./palettes/pal256.png",
 			"--alpha-count", 	"256",	#How many alpha levels
-			"--dither", 		"bayer",	#Dither type
-			"--bayer-size", 	"16", 	#Bayer matrix size
-			"--max-error", 	"0.0",	#Higher will allow farther colros to replace unique colors. Preserves detail but causes banding at high levels. Perfect for pixel art
-			"--merge-radius", "0.0",	#Quantize before palettizing. 1.0 will result roughly in same number of colors as palette, but loses information. Reduces unique colors, so 0.05 to 0.2 is good value for high depth images
-			"--bayer-weight", "1.0",	#Scale threshold by 0.0: = palette channel gaps, 0.0-1.0 palette gap norm * quantized error, 1.0-2.0 bias gap norm. May cause over-dithering but produces smoother gradients and better colors
+			"--dither", 		"blue",	#Dither type
+			"--max-error", 	"0.0",	#Higher will allow farther colors to replace unique colors. Preserves detail
+			"--merge-radius", "0.0",	#Quantize before palettizing. 0.05 to 0.2 is good value for high depth images
+ 			"--mask-size", 	"128", 	#dither matrix size
+			"--mask-weight",	"1.0",	#Dither strength for dither = blue or bayer
 			"--output",			"./output/lazy_test.png",
 		]
 		for arg in lazy_arguments:

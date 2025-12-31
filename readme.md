@@ -1,5 +1,5 @@
 <img src="https://raw.githubusercontent.com/Kaelygon/Kael-Palette-Tools/refs/heads/main/demoImages/Michelangelo_David_steinberg.png" alt="Steinberg example" width="180"/>
-<img src="https://raw.githubusercontent.com/Kaelygon/Kael-Palette-Tools/refs/heads/main/demoImages/LPlumocrista_bayer_example.png" alt="Bayer example" width="256"/>
+<img src="https://raw.githubusercontent.com/Kaelygon/Kael-Palette-Tools/refs/heads/main/demoImages/LPlumocrista_dither_variants.png" alt="Bayer example" width="256"/>
 <img src="https://raw.githubusercontent.com/Kaelygon/Kael-Palette-Tools/refs/heads/main/demoImages/KaelygonLogo25_palettize16_example.png" alt="Palettize all 12 colors using pal16" width="256"/>
 
 ## Multi-license
@@ -27,7 +27,7 @@ Here's some issues that I faced using ffmpeg as palettizer:
 ### palettize_image.py
 *Palettize and dither using arbitrary palette*
 ```
-python palettize_image.py [-h] [-i INPUT] [-p PALETTE] [-o OUTPUT] [-a ALPHA_COUNT] [-e MAX_ERROR] [-m MERGE_RADIUS] [-d DITHER] [-b BAYER_SIZE] [-B BAYER_WEIGHT] [-D DEMO]
+python palettize_image.py [-h] [-i INPUT] [-p PALETTE] [-o OUTPUT] [-a ALPHA_COUNT] [-e MAX_ERROR] [-mr MERGE_RADIUS] [-d DITHER] [-ms MASK_SIZE] [-dw MASK_WEIGHT] [-D DEMO]
 ```
 The only proper tool.
 
@@ -40,20 +40,18 @@ will generate p_input.png in the same folder as input.png
 Options:
 ```
 -D, --demo          (bool ) Generate demo images
+-h, --help          (None ) show this help message and exit
 -i, --input         (str  ) Path to input .png
 -p, --palette       (str  ) Path to palette .png
 -o, --output        (str  ) Path to output .png
 
 -a, --alpha-count   (int  ) How many alpha levels
+-e, --max-error     (float) Higher will allow farther colros to replace unique colors. Preserves detail but causes banding at high levels. 1.0-2.0 is good for pixel art.
+-mr, --merge-radius (float) Quantize before palettizing. Reduces unique colors, 0.01 to 0.2 are good values for high depth images.
+
 -d, --dither        (str  ) Dither type. Options: none, bayer, steinberg
--b, --bayer-size    (int  ) Bayer matrix size. <1 is invalid. Only powers of 2s are proper Bayer matrices. Anything beyond 16 makes little difference 
--e, --max-error     (float) Higher will allow farther colros to replace unique colors. 1.0-1.5 is roughly 12 nearest neighbors in uniform palette. Preserves detail but causes banding at high levels. 1.0-2.0 is good for pixel art.
--m, --merge-radius  (float) Quantize before palettizing. 1.0 will result roughly in same number of colors as palette, but loses information. Reduces unique colors, so 0.01 to 0.2 is good value for high depth images. May improve performance and palettization.
--B, --bayer-weight  (float) Scale threshold by 
-   0.0 palette channel gaps 
-   0.0-1.0 palette gap norm * quantized error 
-   1.0-2.0 bias palette gap norm
-   May over-dither but results in smoother gradients and better colors
+-ms, --mask-size    (int  ) Dither mask tile size for dither=(bayer, blue) 
+-dw, --mask-weight  (float) Dither strength for dither=(none, bayer). >1.0 May over-dither but results in smoother gradients and better colors
 ```
 
 ### palette_generator.py

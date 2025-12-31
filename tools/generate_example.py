@@ -27,12 +27,12 @@ def generateExample(_input, _palette):
 	
 	output_path = "output"
 	concat_output = output_path + "/" + "dither_variants.png"
- 
+
 	variant_fname = []
 	method_list = ConvertPreset.DITHER_METHOD_KEYS
 	for method in method_list:
 		variant_fname.append(output_path+"/"+"variant_"+method+".png")
- 
+
 	preset_list = [
 		ConvertPreset(
 			image				= _input,
@@ -120,7 +120,7 @@ def generateExample(_input, _palette):
 if __name__ == '__main__':
 	img_path = "demoImages/LPlumocrista.png"
 	tmp_crop = "output/LPlumocrista_crop.png"
- 
+
 	in_img = Image.open(img_path).convert("RGBA")
 	crop_start = [66,215]
 	crop_end = [crop_start[0]+192,crop_start[1]+192]

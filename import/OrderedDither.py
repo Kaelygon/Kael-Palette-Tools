@@ -28,7 +28,7 @@ class ordered:
 		order = np.argsort(slice_flat)
 		slice_flat[order] = np.arange(height*width*depth)
 		arr_ranks = slice_flat.reshape(height,width,depth)
-  
+
 		return arr_ranks
 
 	@staticmethod
@@ -89,7 +89,7 @@ class ordered:
 		avg_invert = 1.0-neighborhood_avg
 		new_pos = pixels*(1.0-weight) + avg_invert*(weight)
 		pixels = ordered._normSlices(new_pos)
-  
+
 		pixels = ordered._rankMatrix(pixels,height,width,channel_count)
 		pixels = ordered._normSlices(pixels)
 	

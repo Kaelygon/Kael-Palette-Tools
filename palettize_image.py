@@ -11,7 +11,7 @@ from PalettizeImage import *
 if __name__ == '__main__':
 	sys.argv
 	argv = sys.argv[:]
- 
+
 	im_too_lazy_to_use_terminal = False
 	if im_too_lazy_to_use_terminal and len(argv)<=1:
 		lazy_arguments = [
@@ -32,4 +32,3 @@ if __name__ == '__main__':
 	d_preset = Palettize_parser(argv)
 	if d_preset:
 		Palettize_preset(d_preset)
- 

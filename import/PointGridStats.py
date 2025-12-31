@@ -25,7 +25,7 @@ class PointGridStats:
 			print(str(round(pair[0],precision))+" "+pair[1].getSrgbHex()+" "+pair[2].getSrgbHex())
 
 		#print only unseen values
-		far_start = max(print_count, len(pair_list)-print_count) 
+		far_start = max(print_count, len(pair_list)-print_count)
 		if far_start < len(pair_list):
 			print(listName+" Farthest pairs")
 		for pair in pair_list[far_start:]:

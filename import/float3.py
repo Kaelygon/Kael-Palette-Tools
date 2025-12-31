@@ -64,7 +64,7 @@ def dot_vec3(a, b):
 	return product
 
 def cross_vec3(a, b):
-	return float3( 
+	return float3(
 		a[1]*b[2] - a[2]*b[1],
 		a[2]*b[0] - a[0]*b[2],
 		a[0]*b[1] - a[1]*b[0]
@@ -131,5 +131,5 @@ def run_testFunction():
 
 if __name__ == '__main__':
 	run_testFunction()
- 
+
  

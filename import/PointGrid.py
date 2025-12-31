@@ -87,7 +87,7 @@ class PointGrid:
 		neighborhood = NeighborList(root=p, array=[])
 		px, py, pz = p.col
 		gx, gy, gz = self.key(p)
-  
+
 		cell_span = int(math.ceil((radius + neighbor_margin) / self.cell_size))
 		x_r = [int(max(gx-cell_span, self.max_cells[0][0])), int(min(gx+cell_span, self.max_cells[1][0]) + 1 )]
 		y_r = [int(max(gy-cell_span, self.max_cells[0][1])), int(min(gy+cell_span, self.max_cells[1][1]) + 1 )]
@@ -115,7 +115,7 @@ class PointGrid:
 
 	def findNearest(self, p: KaelColor, point_radius: float, neighbor_margin: float = 0):
 		neighbor = None
-		closest=float('inf') 
+		closest=float('inf')
 
 		kx, ky, kz = self.key(p)
 		for dx in (-1, 0, 1):

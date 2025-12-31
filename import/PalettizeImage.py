@@ -50,18 +50,18 @@ def OkImage_njitFloydSteinberg(pixels:np.ndarray, pal_colors:np.ndarray, width:i
 		x = i - y * width
 
 		old_pixel = pixels[i].copy()
-  
+
 		diffs = pal_colors - old_pixel
 		dists = np.sum(diffs*diffs, axis=1)
 		new_pixel = pal_colors[np.argmin(dists)]
-  
+
 		pixels[i] = new_pixel
 		quant_error = (old_pixel - new_pixel)/16.0
 
 		if x + 1 < width:
 			pixels[i + 1] 			+= quant_error * 7.0
 		if x - 1 >= 0 and y + 1 < height:
-			pixels[i + width - 1]+= quant_error	* 3.0 
+			pixels[i + width - 1]+= quant_error	* 3.0
 		if y + 1 < height:
 			pixels[i + width] 	+= quant_error * 5.0
 		if x + 1 < width and y + 1 < height:
@@ -159,15 +159,15 @@ class OkImage:
 
 		#area[original_index] = dupe_count, so area[0] is how many pixels are unique_color[0]
 		nontransp = self.pixels_output[:, 3] > (1.0 / 255.0) #exclude transparent
-		area = np.bincount( 
-			original_idxs, 
-			weights=nontransp, 
+		area = np.bincount(
+			original_idxs,
+			weights=nontransp,
 			minlength=len(unique_colors)
 		)
 
 		self.unique_list = UniqueList(
-			unique_colors[:,:3], 
-			unique_colors[:, 3], 
+			unique_colors[:,:3],
+			unique_colors[:, 3],
 			area,
 			unique_idxs,
 			original_idxs
@@ -187,13 +187,13 @@ class OkImage:
 		self.pixels_output[:,:3] = pal_list.color[:,:3][idxs]
 
 	#https://bisqwit.iki.fi/story/howto/dither/jy/
-	def ditherOrdered(self, palette_img, matrix_size=16, dither_weight=1.0): 
-		pal_list = palette_img.unique_list  
+	def ditherOrdered(self, palette_img, matrix_size=16, dither_weight=1.0):
+		pal_list = palette_img.unique_list
 		pixels = self.pixels_output[:,:3].copy()
 		pal_tree = pal_list.getUniqueTree()
-  
+
 		#Channel gaps of nearest 2 palette colors to current pixel
-		pal_dists, idxs = pal_tree.query(pixels, k=2) 
+		pal_dists, idxs = pal_tree.query(pixels, k=2)
 		palette_gaps = np.abs(pal_list.color[idxs[:,1]] - pal_list.color[idxs[:,0]])
 
 		#scale by gap norm weighted by distance
@@ -202,7 +202,7 @@ class OkImage:
 			def np_lerp(vec_a, vec_b, fac):
 				return vec_a * (1.0-fac) + vec_b * fac
 
-			palette_gaps_norm = np.linalg.norm(palette_gaps,axis=1)[:,None]*[1,1,1] #smoothest and best colors but over-dithers with some palettes 
+			palette_gaps_norm = np.linalg.norm(palette_gaps,axis=1)[:,None]*[1,1,1] #smoothest and best colors but over-dithers with some palettes
 
 			#limit over-dither
 			max_pal_dist = np.max(pal_dists[:,0])
@@ -210,23 +210,23 @@ class OkImage:
 			gater = gater + max(0.0, dither_weight - 1.0) #1.0-2.0 raises minimum
 			gater = np.clip(gater * dither_weight, 0.0, 1.0)
 
-			palette_gaps = np_lerp(palette_gaps, palette_gaps_norm, gater[:,None]*[1,1,1]) 
-  
+			palette_gaps = np_lerp(palette_gaps, palette_gaps_norm, gater[:,None]*[1,1,1])
+
 		thresholds_lab = ordered.bayerOklab(matrix_size)
-  
+
 		self.pixels_output[:,:3] = self._applyDitherThresholds(pixels, thresholds_lab, palette_gaps, pal_list)
 
 	def ditherBlue(self, palette_img, matrix_size=16, dither_weight=1.0):
-		pal_list = palette_img.unique_list  
+		pal_list = palette_img.unique_list
 		pixels = self.pixels_output[:,:3].copy()
 		pal_tree = pal_list.getUniqueTree()
-  
-		pal_dists, idxs = pal_tree.query(pixels, k=2) 
+
+		pal_dists, idxs = pal_tree.query(pixels, k=2)
 		palette_gaps = np.abs(pal_list.color[idxs[:,1]] - pal_list.color[idxs[:,0]])
 
 		blue_thresholds = ordered.blueNoiseOklab(matrix_size,matrix_size)
 		blue_thresholds = np.array(blue_thresholds) * dither_weight
-  
+
 		self.pixels_output[:,:3] = self._applyDitherThresholds(pixels, blue_thresholds, palette_gaps, pal_list)
 
 
@@ -244,15 +244,15 @@ class OkImage:
 		da = quant_delta[:,1]
 		db = quant_delta[:,2]
 		dalpha = quant_delta[:,3]
-  
+
 		#_rmsq = root mean square
 		lum_rmsq 	= np.sqrt( np.mean(dl**2) )
 		chroma_rmsq= np.sqrt( np.mean(da**2+db**2) )
 		#alpha_rmsq = np.sqrt( np.mean(dalpha**2) )
 		total_rmsq = np.sqrt( np.mean(dl**2 + da**2 + db**2) )
 
-		print("[L,chroma] rmsq: " + 
-			str(round(lum_rmsq,4)) + ", " + 
+		print("[L,chroma] rmsq: " +
+			str(round(lum_rmsq,4)) + ", " +
 			str(round(chroma_rmsq,4))
 		)
 		#print("Alpha rmsq: " + str(round(alpha_rmsq,4)) + ", " )
@@ -263,18 +263,19 @@ class OkImage:
 		b_bias = np.mean(db)
 		alpha_bias = np.mean(dalpha)
 		total_bias = np.linalg.norm( np.mean( quant_delta[:,:3] ) ) #vector length of mean delta
-		print("[L,a,b] bias: " + 
-			str(round(lum_bias,4)) + ", " + 
-			str(round(a_bias,4)) + ", " + 
+		print("[L,a,b] bias: " +
+			str(round(lum_bias,4)) + ", " +
+			str(round(a_bias,4)) + ", " +
 			str(round(b_bias,4))
 		)
 		print("Alpha bias: " + str(round(alpha_bias,4)) + ", " )
 		print("Total bias: " + str(round(total_bias,8)))
 
+
 #Map unique colors to palette, but avoid collapsing similar colors
 #Return unique_palettized[len(unique_list.color)] = [l,a,b,alpha]
 def Palettize_createWeighted(
-	src_img: OkImage, 
+	src_img: OkImage,
 	palette_img: OkImage,
 	max_error: int = 1,
 	k_count = 13
@@ -350,7 +351,7 @@ def Palettize_preset(preset: ConvertPreset):
 	#replace original img pixels with convert_dict
 	if preset.dither == "bayer":
 		image_ok.ditherOrdered(palette_ok, preset.mask_size, preset.mask_weight)
-  
+
 	elif preset.dither == "blue":
 		image_ok.ditherBlue(palette_ok, preset.mask_size, preset.mask_weight)
 
@@ -375,7 +376,7 @@ def Palettize_preset(preset: ConvertPreset):
 		os.makedirs(output_path)
 
 	image_ok.saveImage(preset.output)
-	print("Saved image "+preset.output) 
+	print("Saved image "+preset.output)
 
 	print("\nColor quant-error")
 	image_ok.printImgError()
@@ -468,47 +469,47 @@ def Palettize_parser(argv):
 	parser.add_argument(
 		'-p', '--palette', type=str,
 		default= None,
-		help="Palette .png path"	 
-	) 
+		help="Palette .png path"	
+	)
 	parser.add_argument(
 		'-o', '--output', type=str,
 		default=None,
 		help="Output .png path"	
-	) 
+	)
 	parser.add_argument(
 		'-a', '--alpha-count', type=str,
 		default="1",
 		help="Number of alpha levels"
-	) 
+	)
 	parser.add_argument(
 		'-e', '--max-error', type=str,
 		default="0.0",
 		help="Radius that within neighboring palette colors can replace unique colors. Works only with --dither none"
-	) 
+	)
 	parser.add_argument(
 		'-mr', '--merge-radius', type=str,
 		default="0.0",
 		help="Quantize before palettization. 1.0 is roughly same number of colors as palette."
-	) 
+	)
 	parser.add_argument(
 		'-d', '--dither', type=str,
 		default="none",
 		help="Options: none, bayer, steinberg, blue"
-	) 
+	)
 	parser.add_argument(
 		'-ms', '--mask-size', type=str,
 		default=16,
 		help="Dither matrix size for dither=(bayer, blue)"
-	) 
+	)
 	parser.add_argument(
 		'-dw', '--mask-weight', type=str,
 		default=16,
 		help="Dither strength for dither=(none, bayer)"
-	) 
+	)
 	parser.add_argument(
 		'-D', '--demo',  type=str,
-		default="False", 
-		dest='demo', 
+		default="False",
+		dest='demo',
 		help="Generate test images"
 	)
 
@@ -555,15 +556,15 @@ def Palettize_parser(argv):
 		output_path = os.path.dirname(arg_list.output)
 		output_basename = os.path.basename(arg_list.output)
 
-	if arg_list.output==None or arg_list.output=='': 
+	if arg_list.output==None or arg_list.output=='':
 		#same dir as source with p_ prefix
 		d_preset.output = intput_path + "/" + "p_"+ intput_basename
 
-	elif output_basename == '': 
+	elif output_basename == '':
 		#Only output folder provided
 		d_preset.output = output_path + "/" + "p_"+ intput_basename
 
-	elif arg_list.output == "./": 
+	elif arg_list.output == "./":
 		#current dir
 		d_preset.output = "./" + "p_" + os.path.basename(d_preset.image)
 
@@ -583,7 +584,7 @@ def Palettize_parser(argv):
 		if not os.access(base_dir, os.W_OK):
 			print("Can't access "+base_dir)
 			preset_fail = 1
-   
+
 	for file in input_files:
 		if not os.path.exists(file):
 			print("File doesn't exist "+file)

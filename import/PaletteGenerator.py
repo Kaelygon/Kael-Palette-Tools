@@ -48,7 +48,7 @@ def printHexList(hex_list, palette_name="", new_line=True):
 class PalettePreset:#
 	sample_method: int = 2
 
-	reserve_transparent: bool = True 
+	reserve_transparent: bool = True
 	hex_pre_colors: List[[str,bool]] = None # ["#0123abc",...]
 	img_pre_colors: str = None #file name to existing color palette
 	img_fixed_mask: str = None #file name to fixed mask white=fixed black=movable color
@@ -106,7 +106,7 @@ class PaletteGenerator:
 		apply_luminosity = self.p.max_lum!=1.0 or self.p.min_lum!=0.0
 		apply_saturation = self.p.max_sat!=1.0 or self.p.min_sat!=0.0
 		count=0
-		max_chroma = math.sqrt(0.5**2+0.5**2) 
+		max_chroma = math.sqrt(0.5**2+0.5**2)
 		for p in self.point_grid.cloud:
 			if apply_luminosity:
 				lum_width = self.p.max_lum - self.p.min_lum
@@ -119,7 +119,7 @@ class PaletteGenerator:
 				rel_sat = chroma / max_chroma
 				scaled_sat = (rel_sat * sat_width + self.p.min_sat) * max_chroma
 
-				col_vec = [p.col[1], p.col[2]] #2D Vector a,b 
+				col_vec = [p.col[1], p.col[2]] #2D Vector a,b
 				col_vec = [col_vec[0]/chroma, col_vec[1]/chroma] #Normalize
 				col_vec = [col_vec[0]*scaled_sat, col_vec[1]*scaled_sat] #Scale
 				p.col = [p.col[0], col_vec[0], col_vec[1]]
@@ -196,7 +196,7 @@ class PaletteGenerator:
 		if self.p.gray_count:
 			darkest_black = KaelColor( "SRGB", [0.499/255,0.499/255,0.499/255] ).calcLum()
 			self.p.gray_count = min(self.p.max_colors - len(self.point_grid.cloud), self.p.gray_count)
-			#Use minimum starting luminosity that second darkest black isn't so close to 0 
+			#Use minimum starting luminosity that second darkest black isn't so close to 0
 			for i in range(0,self.p.gray_count):
 				denom = max(1, self.p.gray_count-1)
 				lum = float(i)/((denom))
@@ -208,7 +208,7 @@ class PaletteGenerator:
 	
 	def populatePointCloud(self, histogram_path=None):	
 		unit_volume = self.OKLAB_GAMUT_VOLUME/max(1,self.p.max_colors)
-		cell_size = unit_volume**(1.0/3.0) 
+		cell_size = unit_volume**(1.0/3.0)
 		self.point_radius = cell_size * self.p.packing_fac
 		print("Using point_radius "+str(round(self.point_radius,4)))
 
@@ -256,9 +256,9 @@ class PaletteGenerator:
 			r,g,b = p.asSrgb()
 			if not valid_vec3([r,g,b]):
 				continue
-			r = min( max( int(round(r * 255.0)), 0 ), 255) 
-			g = min( max( int(round(g * 255.0)), 0 ), 255) 
-			b = min( max( int(round(b * 255.0)), 0 ), 255) 
+			r = min( max( int(round(r * 255.0)), 0 ), 255)
+			g = min( max( int(round(g * 255.0)), 0 ), 255)
+			b = min( max( int(round(b * 255.0)), 0 ), 255)
 			rgba.append((r, g, b, 255))
 	
 		if len(rgba) == 0:

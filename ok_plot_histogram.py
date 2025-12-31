@@ -66,7 +66,7 @@ ax.set_ylim(a_min, a_max)
 ax.set_zlim(b_min, b_max)
 
 
-# --- play button 
+# --- play button
 
 def update(val):
     idx = int(slider.val)
@@ -90,7 +90,7 @@ def advance_frame(frame_index):
                       labs_frames[frame_index][:, 1],
                       labs_frames[frame_index][:, 2])
     sc.set_facecolors(srgb_frames[frame_index])
-    slider.set_val(frame_index) 
+    slider.set_val(frame_index)
 
 def toggle_play(event):
     global ani, playing

@@ -32,12 +32,12 @@ if __name__ == '__main__':
 			img_pre_colors = "output/pal64-base.png",#"./data/pre_palette.png",
 			img_fixed_mask = "output/pal64-fixed.png", #"./data/pre_palette_mask.png",
 
-			gray_count	=15, 
-			max_colors	=256, 
+			gray_count	=15,
+			max_colors	=256,
 			hue_count	=12,
-			min_sat		=0.0, 
-			max_sat		=1.0, 
-			min_lum		=0.0, 
+			min_sat		=0.0,
+			max_sat		=1.0,
+			min_lum		=0.0,
 			max_lum		=1.0,
 		
 			packing_fac	=1.2,

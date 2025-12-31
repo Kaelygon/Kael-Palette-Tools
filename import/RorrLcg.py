@@ -5,24 +5,24 @@ class RorrLCG:
 	"""
 		Python random with seed is inconsistent and we only need randomish numbers
 		Simple rotate right LCG for deterministic results
-	"""  
- 
+	"""
+
 	#because of rorr, lcg must be (mul%4==1 AND add%2==1) OR (mul%4==3 AND add%2==0)
 	MUL=377317001288688793
 	ADD=229269304956507589
- 
+
 	LCG_BITS=64 #must be power of 2 and divisible by 8
 	LCG_MASK=2**LCG_BITS-1
 	LCG_SHIFT=int((LCG_BITS+1)/3)
 	LCG_SHIFT_INV=LCG_BITS-LCG_SHIFT
- 
+
 	def __init__(self, in_seed=0):
 		self._randInt: int = 0
 		self.seed(in_seed)
 
 	def _rorrlcg(self, num):
 		num=(num>>self.LCG_SHIFT)|((num<<self.LCG_SHIFT_INV)&self.LCG_MASK) #RORR
-		num=(num*self.MUL+self.ADD)&self.LCG_MASK #LCG, 
+		num=(num*self.MUL+self.ADD)&self.LCG_MASK #LCG,
 		return num
 
 	#unsigned int
@@ -59,7 +59,7 @@ class RorrLCG:
 		l = math.sqrt(vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2])
 		return (vec[0]/l, vec[1]/l, vec[2]/l)
 
-	def hash(self, string, shuffle_count=6): 
+	def hash(self, string, shuffle_count=6):
 		_bytes = list(string.encode('utf-8'))
 
 		out_num=4611686018427384821 #null string value, can be any

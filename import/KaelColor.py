@@ -168,7 +168,7 @@ class KaelColor:
 
 	def isOkSrgbGray(self, threshold: float = 1.0/255.0):
 		r,g,b = self.asSrgb()
-		if( abs(r-g) < threshold and 
+		if( abs(r-g) < threshold and
 			abs(g-b) < threshold
 		):
 			return True

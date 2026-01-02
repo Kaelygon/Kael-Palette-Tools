@@ -5,20 +5,21 @@
 
 import os
 import sys
+import numpy as np
 sys.path.insert(1, './import/')
 from PaletteGenerator import *
 from PointListStats import *
 
 def run_PaletteGenerator(preset : PalettePreset, palette_file, histogram_file):
+	np.random.seed(preset.seed)
+
 	palette = PaletteGenerator()
 	point_list = palette.populatePointList(preset, histogram_file)
-
 	point_list = palette.sortPalette(preset, point_list)
 
 	palette.paletteToImg(preset, point_list, palette_file)
 
 	PointListStats.printGapStats(point_list,4)
-
 	print("Generated "+str(point_list.length() + preset.reserve_transparent)+" colors to "+palette_file)
 
 
@@ -30,7 +31,7 @@ if __name__ == '__main__':
 			img_fixed_mask = None, #"output/pal64-fixed.png", #"./data/pre_palette_mask.png",
 
 			gray_count	=7,
-			max_colors	=256,
+			max_colors	=64,
 			hue_count	=12,
 			min_sat		=0.0,
 			max_sat		=1.0,
@@ -38,9 +39,9 @@ if __name__ == '__main__':
 			max_lum		=1.0,
 		
 			packing_fac	=1.2,
-			max_attempts=1024*32,
-			relax_count =512,
-			seed=0
+			max_attempts=1024,
+			relax_count =256,
+			seed=1
 		)
 
 	output_path = "./output"

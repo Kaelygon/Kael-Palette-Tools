@@ -43,5 +43,4 @@ class PointList:
 		return len(self.points)
 
 	def concat(self, new_list):
-		#TODO: should we verify/convert typing or leave that to user? 
 		self.points = np.concatenate([self.points, new_list.points])

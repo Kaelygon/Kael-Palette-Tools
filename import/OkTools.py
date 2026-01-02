@@ -1,4 +1,3 @@
-#OkTools.py
 from oklabConversion import *
 
 import numpy as np
@@ -7,19 +6,19 @@ from numpy.typing import NDArray
 
 #Manipulate arrays of colors
 class OkTools:
+	FALLBACK_NORM = np.array([0.57735026918962576451]*3) * [1,-1,1] #sqrt(1/3)
 
 	def vec3_array_norm(vector_list: NDArray[[float]*3]):
-		l = np.linalg.norm(vector_list,axis=1)
-		non_zero_move = l!=0
-
-		norm = np.zeros_like(vector_list) + [1,0,0]
-		norm[non_zero_move] = vector_list[non_zero_move]/(l[non_zero_move][:,None])
+		l = np.linalg.norm(vector_list, axis=1, keepdims=True)
+		l[l==0] = 1.0
+		norm = vector_list / l
+		norm[np.all(vector_list == 0, axis=1)] = OkTools.FALLBACK_NORM
 		return norm
 
 	def vec3_norm(vector: [float]*3):
 		l = np.linalg.norm(vector)
 		if l==0:
-			return [1,0,0]
+			return OkTools.FALLBACK_NORM
 		return vector/l
 
 	@staticmethod
@@ -35,15 +34,15 @@ class OkTools:
 		out_gamut = (lin_list < -eps) | (lin_list > 1+eps)
 		out_gamut = out_gamut.any(axis=1)
 
-		clip_move = np.zeros_like(lab_list)
-	
-		new_pos = np.clip(lin_list[out_gamut],[0.0]*3,[1.0]*3)
-		if np.any(new_pos):
+		if np.any(out_gamut):
+			new_pos = np.clip(lin_list[out_gamut],[0.0]*3,[1.0]*3)
 			new_lab = linearToOklab(new_pos)
+			clip_move = np.zeros_like(lab_list)
 			clip_move[out_gamut] = new_lab - lab_list[out_gamut] #movement in ok space
 			lab_list[out_gamut] = new_lab
+			return lab_list, clip_move
 
-		return lab_list, clip_move
+		return lab_list, None
 
 	@staticmethod
 	def calcChroma(lab_list):

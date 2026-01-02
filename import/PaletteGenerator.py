@@ -14,13 +14,6 @@ from oklabConversion import *
 from ParticleSim import *
 from OkTools import *
 
-"""
-TODO: refactor palette generator to use striped numpy array instead of KaelColor
-"""
-
-
-
-	
 
 
 ### Palette generator ###
@@ -60,10 +53,9 @@ class PalettePreset:#
 
 
 class PointSampler:
-	#TODO: verify distribution
+
 	#Simple rejection sampling
 	@staticmethod
-
 	def poissonReject(
 		point_list: PointList, 
 		min_dist: float, 
@@ -119,7 +111,6 @@ class PointSampler:
 		return output_list
 		
 
-	#TODO: refactor
 	#Add points to origin
 	@staticmethod
 	def zero(preset: PalettePreset, point_count: int):
@@ -158,13 +149,12 @@ class PointSampler:
 
 		return gray_list
 
-#TODO: refactor
+
 class PaletteGenerator:
 	"""
 		Generate palette where the colors are perceptually evenly spaced out in OKLab colorspace
 	"""
 
-	#TODO: refactor
 	def applyColorLimits(self, preset: PalettePreset, point_list: PointList):
 		apply_luminosity = preset.max_lum!=1.0 or preset.min_lum!=0.0
 		apply_saturation = preset.max_sat!=1.0 or preset.min_sat!=0.0
@@ -229,7 +219,6 @@ class PaletteGenerator:
 
 	### Oklab point sampler methods within gamut ###
 
-	#TODO: refactor
 	#public
 	def populatePointList(self, preset : PalettePreset, histogram_path: str = None):	
 		cell_size = approxOkGap(preset.max_colors)
@@ -272,23 +261,10 @@ class PaletteGenerator:
 			record_frames = histogram_path,
    	)
 
-		palette_list = self.applyColorLimits(preset, palette_list) #TODO:
+		palette_list = self.applyColorLimits(preset, palette_list)
 
 		return palette_list
 
-
-
-	#TODO: refactor
-	### Palette processing ###
-	def paletteToHex(self):
-		hex_list = []
-		if preset.reserve_transparent:
-				hex_list.append("#00000000")
-	
-		for p in self.point_grid.cloud:
-			hex_list.append(p.getSrgbHex())
-		
-		return hex_list
 
 	def paletteToImg(self, preset: PalettePreset, point_list: PointList, filename: str = "palette.png"):
 		rgba = np.zeros((preset.max_colors,4))

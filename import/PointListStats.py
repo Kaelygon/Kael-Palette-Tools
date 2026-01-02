@@ -1,4 +1,3 @@
-##CC0 Kaelygon 2025
 import math
 import numpy as np
 from scipy.spatial import cKDTree
@@ -12,12 +11,27 @@ from OkTools import *
 class PointListStats:
 	@staticmethod
 	def _printPairStats(color_list: np.ndarray, print_count: int, listName:str = "", precision: int = 4):
+		if len(color_list)==0:
+			return
 		color_tree = cKDTree(color_list)
 		dists, idxs = color_tree.query(color_list, k=2)
 
 		pair_idxs = idxs[:,:2]
 		pair_dists = dists[:,1]
 
+		#remove redundant
+		pair_idxs = np.sort(pair_idxs, axis=1) #[a,b] [b,a] -> [a,b] [a,b]
+		_, unique_idxs = np.unique(pair_idxs, axis=0, return_index=True)
+
+		pair_idxs = pair_idxs[unique_idxs]
+		pair_dists = pair_dists[unique_idxs]
+
+		# sort by distance
+		sorted_idxs = np.argsort(pair_dists)
+		pair_idxs = pair_idxs[sorted_idxs]
+		pair_dists = pair_dists[sorted_idxs]
+
+		#srgb is only used for hex printing
 		srgb_list = oklabToSrgb(color_list)
 		srgb_pairs = srgb_list[pair_idxs]
 
@@ -36,14 +50,13 @@ class PointListStats:
 		far_start = max(print_count, len(pair_idxs)-print_count)
 		if far_start < len(pair_idxs):
 			print(listName+" Farthest pairs")
-		for i, pair in enumerate(pair_idxs[far_start:], far_start):
-			srgb_pair = srgb_pairs[i]
-			str_first=OkTools.srgbToHex(srgb_pair[0])
-			str_second=OkTools.srgbToHex(srgb_pair[1])
+			for i, pair in enumerate(pair_idxs[far_start:], far_start):
+				srgb_pair = srgb_pairs[i]
+				str_first=OkTools.srgbToHex(srgb_pair[0])
+				str_second=OkTools.srgbToHex(srgb_pair[1])
 
-			pair_dist = pair_dists[i]
-			print("d:" + str(round(pair_dist,precision))+" "+str_first+" "+str_second)
-		print("")
+				pair_dist = pair_dists[i]
+				print("d:" + str(round(pair_dist,precision))+" "+str_first+" "+str_second)
 
 
 		#Average and median
@@ -75,5 +88,3 @@ class PointListStats:
 
 		PointListStats._printPairStats(gray_colors,print_count,"Grayscale")
 		PointListStats._printPairStats(hued_colors,print_count,"Chroma")
-
-		pass

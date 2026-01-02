@@ -8,8 +8,7 @@ sys.path.insert(1, './import/')
 sys.path.insert(2, './output/')
 
 from cloudHistogram import oklab_frame_list
-from float3 import *
-from KaelColor import *
+from oklabConversion import *
 
 """
 thanks for chat gee pee tee for this absolute mess of a script
@@ -27,13 +26,9 @@ for frame in oklab_frame_list:
 # Convert all frames to sRGB for plotting
 srgb_frames = []
 for frame in oklab_frame_list:
-    rgb_frame = []
-    for lab in frame:
-        kc = KaelColor("OKLAB", lab)
-        rgb = kc.asSrgb()
-        rgb_clipped = clip_vec3(rgb, [0]*3, [1]*3)
-        rgb_frame.append([rgb_clipped[0],rgb_clipped[1],rgb_clipped[2]])
-    srgb_frames.append(np.array(rgb_frame))
+	rgb_frame = oklabToSrgb(np.array(frame))
+	rgb_frame = np.clip(rgb_frame,[0]*3,[1]*3)
+	srgb_frames.append(np.array(rgb_frame))
 
 
 # Initial plot

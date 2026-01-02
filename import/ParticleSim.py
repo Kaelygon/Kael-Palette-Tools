@@ -26,31 +26,35 @@ class ParticleSim:
 	"""Physics based spring/collision simulator to distribute points."""
 
 	#Too far: attract, Too close: repel # f=-kx (single particle)
-	def calcSpringForce(self, particle: ParticleType, neighbors_dist_sq: [float]*3, neighbor_norm: [float]*3, spring_constant: float = 1.0):
+	def calcSpringForce(self, particle: ParticleType, neighbors_dist_sq: NDArray[[float]*3], neighbor_norm: NDArray[[float]*3]):
+		beyond_radius = neighbors_dist_sq > particle["radius"]**2
+		spring_constant = np.full(len(neighbors_dist_sq),particle["k"])
+		spring_constant[beyond_radius] = 0.0 #attraction force (disabled)
+
 		delta_x = np.sqrt(neighbors_dist_sq) - particle["radius"]
 		spring_mag = -1.0 * spring_constant * delta_x #f=-kx
 		spring_force = neighbor_norm*spring_mag[:,None]
 		spring_force = np.sum(spring_force,axis=0)
 		return spring_force
 
-	def moveToVelocity(self, move_delta: [float]*3, time_delta: float):
+	def moveToVelocity(self, move_delta: NDArray[[float]*3], time_delta: float):
 		return move_delta / time_delta #v = dx/dt
 	
-	def velocityToForce(self, particles: ParticleType, velocity: [float]*3, time_delta: float):
+	def velocityToForce(self, particles: NDArray[ParticleType], velocity: NDArray[[float]*3], time_delta: float):
 		return velocity * particles["m"] / time_delta #f = dv*m/dt
 	
-	def forceToVelocity(self, particles: ParticleType, force: [float]*3, time_delta: float):
+	def forceToVelocity(self, particles: NDArray[ParticleType], force: NDArray[[float]*3], time_delta: float):
 		velocity = force * time_delta / particles["m"][:,None] #dv = f*dt/m
 		return velocity
 
 	#force from distance moved in time step. f=m*((dx/dt)/dt)
-	def moveToForce(self, particles: ParticleType, move_delta: [float]*3, time_delta: float):
+	def moveToForce(self, particles: NDArray[ParticleType], move_delta: NDArray[[float]*3], time_delta: float):
 		velocity = self.moveToVelocity(move_delta, time_delta) #v = dx/dt
 		force = self.velocityToForce(particles, velocity, time_delta)
 		return force
 
 	#returns the force needed to reflect p0 velocity  # f = - 2 * (vec . n) * n
-	def calcReflectVelocity(self, particles: NDArray[ParticleType], surface_norm: [float]*3, time_delta: float):
+	def calcReflectVelocity(self, particles: NDArray[ParticleType], surface_norm: NDArray[[float]*3]):
 		velocity = particles["v"]
 		dot_v = np.sum(velocity*surface_norm, axis=1) #(vec . n)
 		reflected_v = -1.0 * (particles["COR"]+1.0) * dot_v # - 2 * (vec . n)
@@ -74,32 +78,29 @@ class ParticleSim:
 
 		if new_dt>prev_dt:
 			new_dt = new_dt*(1.0-smoothing) + prev_dt*smoothing
-		new_dt = max(min(new_dt,max_dt),1e-4)
+		new_dt = max(min(new_dt,max_dt),1e-2)
 
 		return new_dt
 
 	#update particle.radius adaptively
-	def calcParticleRadius(self, particles: NDArray[ParticleType], neighbor_idxs: list[int], max_r_change: float=0.2, time_delta: float=1.0):
-		output_radii = np.zeros_like(particles["radius"]) - 1
+	def calcParticleRadius(self, particles: NDArray[ParticleType], neighbor_idxs: list[[int]], max_r_change: float=0.2, time_delta: float=1.0):
+		output_radii = np.zeros_like(particles["radius"])
 		particle_count = len(particles)
 
-		radii = particles["radius"]
-		scale_limit = radii*max_r_change*time_delta #max radius change in time step
+		scale_limit = particles["radius"]*max_r_change*time_delta #max radius change in time step
 
-		approx_speed = np.sum(particles["v"],axis=1)
-		almost_stopped = approx_speed < (0.1*radii/time_delta)
+		approx_velocity = np.sum(np.abs(particles["v"]),axis=1) #manhattan distance
+		almost_stopped = approx_velocity < (0.1*particles["radius"]/time_delta)
 
-		neighbor_count = np.zeros(particle_count)
-		for i,neighbors in enumerate(neighbor_idxs):
-			neighbor_count[i] = len(neighbors)
+		neighbor_count = np.vectorize(len)(neighbor_idxs)
 
 		#no neighbors cases 
 		no_neighbors = neighbor_count==0
 		moving_and_alone = no_neighbors & ~almost_stopped
 		stopped_and_alone = no_neighbors & almost_stopped
 
-		output_radii[moving_and_alone] = radii[moving_and_alone] #no change
-		output_radii[stopped_and_alone] = radii[stopped_and_alone] + scale_limit[stopped_and_alone] #max change
+		output_radii[moving_and_alone] = particles["radius"][moving_and_alone] #no change
+		output_radii[stopped_and_alone] = particles["radius"][stopped_and_alone] + scale_limit[stopped_and_alone] #max change
 		
 		#Scale radius kissing spheres 
 		#fewer kissing spheres results in radius increase
@@ -123,7 +124,7 @@ class ParticleSim:
 			avg_stress[i] = np.median(particles["stress"][neighbors])
 			median_radius[i] = np.median(particles["radius"][neighbors])
 
-		#If point is being squeezed very hard, the local region is considered unstable, so we limit radius growth
+		#If point is being pushed hard, the local region is considered unstable, so we limit radius growth
 		is_unstable = (particles["stress"] > 2.0*avg_stress) & almost_stopped
 
 		#We also limit clipping points radius growth
@@ -132,16 +133,10 @@ class ParticleSim:
 			kissing_scale[unstable_or_clipping] = np.clip(kissing_scale[unstable_or_clipping], 0.0, 1.0)
 
 		new_radius = median_radius*kissing_scale
-		new_radius = np.clip(new_radius, radii*0.5, radii+scale_limit)
+		new_radius = np.clip(new_radius, particles["radius"]*0.5, particles["radius"]+scale_limit)
 
 		has_neighbors = ~no_neighbors
 		output_radii[has_neighbors] = new_radius[has_neighbors]
-
-		invalid_output = output_radii==-1
-		if np.any(invalid_output):
-			print("Missing outputs")
-			exit(-1)
-
 		output_radii = np.clip(output_radii,1e-20,2.0)
 		return output_radii
 
@@ -150,13 +145,13 @@ class ParticleSim:
 
 		base_point = np.zeros((1),dtype=ParticleType)
 
-		base_point["pos"]=[-1,-1,-1]
-		base_point["fixed"]=-1
+		base_point["pos"]=None
+		base_point["fixed"]=None
 
 		base_point["v"]=[0.0, 0.0, 0.0]
 		base_point["A"]=math.pi * (0.1)**2 #m^2
 		base_point["Cd"]=0.47 #sphere
-		base_point["rho"]=3.0 #kg/l
+		base_point["rho"]=3.0 #kg/m^3
 		base_point["m"]=0.4 #kilograms
 		base_point["k"]=0.4
 		base_point["COR"]=0.6
@@ -165,7 +160,8 @@ class ParticleSim:
 		base_point["clipped"]=False
 		base_point["stress"]=0.0
 
-		particle_list = np.full( (len(point_list.points)), base_point )
+		particle_list = np.empty(len(point_list.points), dtype=ParticleType)
+		particle_list[:] = base_point
 
 		particle_list["pos"] = point_list.points["color"]
 		particle_list["fixed"] = point_list.points["fixed"]
@@ -197,7 +193,7 @@ class ParticleSim:
 		self.sim_dt = 0.1
 
 		if anneal_steps == None:
-			anneal_steps = min(iterations//8, 64)
+			anneal_steps = min(iterations//16, 32)
 
 		particles = self.createParticles(point_list, approx_radius)
 
@@ -209,11 +205,6 @@ class ParticleSim:
 		min_r,med_r,max_r = [approx_radius]*3
 
 		for tick in range(iterations):
-			#np.random.shuffle(particles)
-
-			if tick>0:
-				unit_size = min(0.25,min_r) * 0.5 #gamut dims is ~1x1x1
-				self.sim_dt = self.calcTimeStep(self.sim_dt, particles, unit_size=unit_size, smoothing=0.5, max_dt = 0.5)
 		
 			#Apply movement from velocity
 			movable_idxs = ~particles["fixed"]
@@ -249,19 +240,20 @@ class ParticleSim:
 			#gamut reflect
 			particles["pos"], clip_move = OkTools.clipToOklabGamut(particles["pos"]) # dx
 	
-			non_zero_move = np.any(clip_move != [0.0]*3, axis=1)
-			particles["clipped"] = non_zero_move
+			particles["clipped"] = False
+			if clip_move is not None:
+				non_zero_move = np.any(clip_move, axis=1)
+				particles["clipped"] = non_zero_move
 
-			if np.any(non_zero_move):
 				surface_norm = OkTools.vec3_array_norm(clip_move[non_zero_move])
-				particles["v"][non_zero_move] = self.calcReflectVelocity(particles[non_zero_move], surface_norm, self.sim_dt)
+				particles["v"][non_zero_move] = self.calcReflectVelocity(particles[non_zero_move], surface_norm)
 
 
 			all_forces=[]
 			#neighbor forces
 			#every point has different number of neighbors so this can't be fully vectorized
 			neighbor_force = np.zeros_like(particles["v"])
-			fixed_bounce_norm = np.zeros_like(particles["v"])
+			fixed_bounce_norm = []
 			fixed_bounce_idxs = []
 			for i, neighbor_idxs in enumerate(neighbors_list):
 				if particles["fixed"][i]:
@@ -274,43 +266,36 @@ class ParticleSim:
 				neighbors_dist_vec = particles["pos"][i] - particles["pos"][neighbor_idxs]
 				neighbors_dist_sq = np.sum(neighbors_dist_vec**2,axis=1)
 
-				#push away from first overlapping neighbor if any
-				inside_neighbor = neighbors_dist_sq == 0.0
+				#jitter if exactly on top of neighbor
 				if np.any( neighbors_dist_sq==0.0 ):
 					rand_norm = np.random.rand(3)
 					push_move = particles["radius"][i] * self.sim_dt * rand_norm
 					push_force = self.moveToForce(particles[i], push_move, self.sim_dt)
-					neighbor_force[i]+= push_force
+					neighbor_force[i] = push_force
 					continue
 
-				#spring influence
-				spring_mul = np.zeros((neighbor_count)) + 1.0
-				outside_radius = neighbors_dist_sq > particles["radius"][i]**2
-				spring_mul[outside_radius] = 0.0 #attraction force
-
+				#spring forces
 				neighbor_norm = OkTools.vec3_array_norm(neighbors_dist_vec)
-				spring_force = self.calcSpringForce(particles[i], neighbors_dist_sq, neighbor_norm, spring_mul*particles[i]["k"])
-				neighbor_force[i]+= spring_force
+				spring_force = self.calcSpringForce(particles[i], neighbors_dist_sq, neighbor_norm)
+				neighbor_force[i] = spring_force
 
 				#backlog bounces if inside fixed
 				fixed_neighbors = particles[neighbor_idxs]["fixed"]
 				if np.any(fixed_neighbors): 
-					colliding_fixed_dist_vec = neighbors_dist_vec[fixed_neighbors][0]
-					fixed_bounce_norm[i] = OkTools.vec3_norm(colliding_fixed_dist_vec)
-					fixed_bounce_idxs.append(i)
+					fixed_bounce_norm.append(neighbor_norm[fixed_neighbors][0])
+					fixed_bounce_idxs.append(i) #particles idxs
 
 			#apply fixed bounces
 			if len(fixed_bounce_idxs):
-				fixed_bounce_norm = fixed_bounce_norm[fixed_bounce_idxs]
-				particles["v"][fixed_bounce_idxs] = self.calcReflectVelocity(particles[fixed_bounce_idxs], fixed_bounce_norm, self.sim_dt)
+				particles["v"][fixed_bounce_idxs] = self.calcReflectVelocity(particles[fixed_bounce_idxs], fixed_bounce_norm)
 
-			particles["stress"] = abs(np.sum(neighbor_force,axis=1))
+			particles["stress"] = np.abs(np.sum(neighbor_force,axis=1))
 			all_forces.append(neighbor_force)
 
 
 			#drag, opposing #Fd=0.5*p*A*Cd*v^2
-			drag_factors = -1.0 * 0.5 * particles["rho"] * particles["A"] * particles["Cd"]
-			drag_force = drag_factors[:,None] * particles["v"]**2
+			drag_factors = 0.5 * particles["rho"] * particles["A"] * particles["Cd"]
+			drag_force = -1.0 * drag_factors[:,None] * particles["v"]**2
 			all_forces.append(drag_force)
 
 
@@ -323,11 +308,16 @@ class ParticleSim:
 			force_delta=np.sum(all_forces,axis=0)
 			delta_velocity = self.forceToVelocity(particles, force_delta, self.sim_dt)
 			particles["v"] = particles["v"] + delta_velocity
+
+
+			#update timestep
+			unit_size = min(0.25,min_r) * 0.5 #gamut dims is ~1x1x1
+			self.sim_dt = self.calcTimeStep(self.sim_dt, particles, unit_size=unit_size, smoothing=0.5, max_dt = 0.5)
 		
+
 			#logging
 			if tick%log_frequency==0 or tick==iterations-1:
 				total_energy=self.calcTotalEnergy(particles)
-				prev_energy=total_energy
 				out_str = "DT: " + str(round(self.sim_dt,4)) + " Total energy["+str(tick)+"]:"
 				out_str+= " "+str(total_energy)
 				print(out_str)

@@ -1,3 +1,7 @@
+"""
+Obsolete, since we are switching from python.rand to numpy.random
+"""
+
 import time
 import math
 

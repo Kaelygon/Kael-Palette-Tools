@@ -7,32 +7,29 @@ import os
 import sys
 sys.path.insert(1, './import/')
 from PaletteGenerator import *
+from PointListStats import *
 
-def run_PaletteGenerator(active_preset, palette_file, histogram_file):
-	palette = PaletteGenerator(preset=active_preset)
-	palette.populatePointCloud(histogram_file)
+def run_PaletteGenerator(preset : PalettePreset, palette_file, histogram_file):
+	palette = PaletteGenerator()
+	point_list = palette.populatePointList(preset, histogram_file)
 
-	palette.sortPalette()
+	point_list = palette.sortPalette(preset, point_list)
 
-	palette.paletteToImg(palette_file)
+	palette.paletteToImg(preset, point_list, palette_file)
 
-	PointGridStats.printGapStats(palette.point_grid,4)
+	PointListStats.printGapStats(point_list,4)
 
-	hex_string = palette.paletteToHex()	
-	printHexList(hex_string,palette_name)
-
-	print("Generated "+str(len(palette.point_grid.cloud) + active_preset.reserve_transparent)+" colors to "+palette_file)
+	print("Generated "+str(point_list.length() + preset.reserve_transparent)+" colors to "+palette_file)
 
 
 if __name__ == '__main__':
 	preset_pal64 = PalettePreset(
 			sample_method=2,
 			reserve_transparent=1,
-			hex_pre_colors = None, #[["abcdef",True],["abc123ff",False]],
-			img_pre_colors = "output/pal64-base.png",#"./data/pre_palette.png",
-			img_fixed_mask = "output/pal64-fixed.png", #"./data/pre_palette_mask.png",
+			img_pre_colors = None, #"output/pal64-base.png",#"./data/pre_palette.png",
+			img_fixed_mask = None, #"output/pal64-fixed.png", #"./data/pre_palette_mask.png",
 
-			gray_count	=15,
+			gray_count	=7,
 			max_colors	=256,
 			hue_count	=12,
 			min_sat		=0.0,

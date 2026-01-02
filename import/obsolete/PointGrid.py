@@ -1,4 +1,6 @@
-
+"""
+Obsolete, replaced by PointList.py
+"""
 
 import math
 from dataclasses import dataclass, field

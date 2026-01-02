@@ -1,8 +1,9 @@
+#oklabConversion.py
 import numpy as np
 
 ### Constants ###
 OKLAB_8BIT_MARGIN = 1e-8
-OKLAB_GAMUT_VOLUME = 0.054197416
+OKLAB_GAMUT_VOLUME = 0.054197416 # (oklab gamut) / (srgb gamut)
 
 def approxOkGap(point_count: int):
 	return (OKLAB_GAMUT_VOLUME/max(1,point_count))**(1.0/3.0)

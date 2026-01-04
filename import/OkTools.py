@@ -8,11 +8,11 @@ from numpy.typing import NDArray
 class OkTools:
 	FALLBACK_NORM = np.array([0.57735026918962576451]*3) * [1,-1,1] #sqrt(1/3)
 
-	def vec3_array_norm(vector_list: NDArray[[float]*3]):
-		l = np.linalg.norm(vector_list, axis=1, keepdims=True)
+	def vec3_array_norm(vector_list: NDArray[[float]*3], axis=1):
+		l = np.linalg.norm(vector_list, axis=axis, keepdims=True)
 		l[l==0] = 1.0
 		norm = vector_list / l
-		norm[np.all(vector_list == 0, axis=1)] = OkTools.FALLBACK_NORM
+		norm[np.all(vector_list == 0, axis=axis)] = OkTools.FALLBACK_NORM
 		return norm
 
 	def vec3_norm(vector: [float]*3):
@@ -22,14 +22,14 @@ class OkTools:
 		return vector/l
 
 	@staticmethod
-	def inOklabGamut(lab_list, eps:float=1e-7):
+	def inOklabGamut(lab_list, eps:float=1e-12):
 		lin_list = oklabToLinear(lab_list)
 		in_gamut = (lin_list >= -eps) & (lin_list <= 1+eps)
 		in_gamut = in_gamut.all(axis=1)
 		return in_gamut
 
 	@staticmethod
-	def clipToOklabGamut(lab_list, eps:float=1e-7):
+	def clipToOklabGamut(lab_list, eps:float=1e-12):
 		lin_list = oklabToLinear(lab_list)
 		out_gamut = (lin_list < -eps) | (lin_list > 1+eps)
 		out_gamut = out_gamut.any(axis=1)

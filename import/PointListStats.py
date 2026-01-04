@@ -11,8 +11,9 @@ from OkTools import *
 class PointListStats:
 	@staticmethod
 	def _printPairStats(color_list: np.ndarray, print_count: int, listName:str = "", precision: int = 4):
-		if len(color_list)==0:
+		if len(color_list)<2:
 			return
+
 		color_tree = cKDTree(color_list)
 		dists, idxs = color_tree.query(color_list, k=2)
 

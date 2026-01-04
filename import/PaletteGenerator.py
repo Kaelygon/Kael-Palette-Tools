@@ -155,13 +155,17 @@ class PaletteGenerator:
 		Generate palette where the colors are perceptually evenly spaced out in OKLab colorspace
 	"""
 
-	def applyColorLimits(self, preset: PalettePreset, point_list: PointList):
+	@staticmethod
+	def _applyColorLimits(preset: PalettePreset, point_list: PointList):
+		if point_list==None:
+			return point_list
 		apply_luminosity = preset.max_lum!=1.0 or preset.min_lum!=0.0
 		apply_saturation = preset.max_sat!=1.0 or preset.min_sat!=0.0
 
 		max_chroma = math.sqrt(0.5**2+0.5**2)
 
-		color_list = point_list.points["color"]
+		not_fixed = ~point_list.points["fixed"]
+		color_list = point_list.points["color"][not_fixed]
 
 		if apply_luminosity:
 			lum_width = preset.max_lum - preset.min_lum
@@ -183,13 +187,14 @@ class PaletteGenerator:
 			col_vec = col_vec*scaled_sat[:,None] #Scale
 			color_list[hued_idxs,1:3] = col_vec
 
-		point_list.points["color"] = color_list
+		point_list.points["color"][not_fixed] = color_list
 		return point_list
 
 
 
 	#convert preset.img_pre_colors to PointList. White color in preset.img_fixed_mask makes the point immovable 
-	def getPreColors(self, preset: PalettePreset, alpha_threshold:int=0, fixed_mask_threshold:int=128):
+	@staticmethod
+	def _getPreColors(preset: PalettePreset, alpha_threshold:int=0, fixed_mask_threshold:int=128):
 		#Add uint8 colors from image
 		pre_palette = Image.open(preset.img_pre_colors)
 		pre_palette = pre_palette.convert('RGBA')
@@ -199,7 +204,7 @@ class PaletteGenerator:
 		lab_list = srgbToOklab(rgba_list[:,:3])
 		alpha_list = rgba_list[:,3]
 
-		fixed_list = np.zeros(len(lab_list)) + 1
+		fixed_list = np.zeros(len(lab_list)) + 1 #if no fixed_mask, default=fixed
 		if preset.img_fixed_mask !=None:
 			fixed_mask = Image.open(preset.img_fixed_mask)
 			fixed_mask = fixed_mask.convert('L')
@@ -220,7 +225,8 @@ class PaletteGenerator:
 	### Oklab point sampler methods within gamut ###
 
 	#public
-	def populatePointList(self, preset : PalettePreset, histogram_path: str = None):	
+	@staticmethod
+	def populatePointList(preset : PalettePreset, histogram_path: str = None):	
 		cell_size = approxOkGap(preset.max_colors)
 		point_radius = cell_size * preset.packing_fac
 		print("Using point_radius "+str(round(point_radius,4)))
@@ -229,7 +235,7 @@ class PaletteGenerator:
 
 		#preset points
 		if preset.img_pre_colors != None:
-			pre_points = self.getPreColors(preset)
+			pre_points = PaletteGenerator._getPreColors(preset)
 			palette_list.concat(pre_points)
 
 		#grayscale points
@@ -261,12 +267,13 @@ class PaletteGenerator:
 			record_frames = histogram_path,
    	)
 
-		palette_list = self.applyColorLimits(preset, palette_list)
+		palette_list = PaletteGenerator._applyColorLimits(preset, palette_list)
 
 		return palette_list
 
 
-	def paletteToImg(self, preset: PalettePreset, point_list: PointList, filename: str = "palette.png"):
+	@staticmethod
+	def saveAsImage(preset: PalettePreset, point_list: PointList, filename: str = "palette.png"):
 		rgba = np.zeros((preset.max_colors,4))
 
 		lab_list = point_list.points["color"]
@@ -285,7 +292,8 @@ class PaletteGenerator:
 		img.save(filename)
 		return img
 
-	def sortPalette(self, preset : PalettePreset, point_list : PointList):
+	@staticmethod
+	def sortPalette(preset : PalettePreset, point_list : PointList):
 		color_list = point_list.points["color"]
 		is_gray = OkTools.isOkSrgbGray(color_list) 
 		gray_colors = color_list[is_gray] 

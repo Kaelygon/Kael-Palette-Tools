@@ -47,7 +47,7 @@ ax.set_zlabel('b')
 # --- Slider
 
 # Slider axis
-ax_slider = plt.axes([0.2, 0.02, 0.6, 0.03], facecolor='lightgoldenrodyellow')
+ax_slider = plt.axes([0.2, 0.02, 0.4, 0.03], facecolor='lightgoldenrodyellow')
 slider = Slider(ax_slider, 'Frame', 0, len(oklab_frame_list) - 1, valinit=0, valstep=1)
 
 # Compute global ranges

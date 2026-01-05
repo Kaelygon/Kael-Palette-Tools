@@ -7,11 +7,25 @@ from scipy.spatial import cKDTree
 from OkTools import *
 from PointList import *
 
-@dataclass
+
 class ParticleType:
-	pos:		"float[][]3	pos"		#position
-	fixed:	"float[]		fixed"	#is immovable?
+	"""ParticleType ParticleType(PointList point_list, float start_radius)"""
+	class DEF: #default values
+		v			= [0.0,0,0]
+		A			= math.pi * (0.1)**2
+		Cd			= 0.47
+		rho		= 3.0
+		m			= 0.4
+		k			= 0.4 
+		COR		= 0.6 
+		mu			= 0.1
+		clipped	= False 
+		stress	= 0.0 
+
+	pos:		"float[][3]	pos"		#position
+	fixed:	"bool[]		fixed"	#is immovable?
 	v:			"float[][3]	v"			#velocity
+	v_mag:	"float[] 	v_mag"	#velocity magnitude
 	A:			"float[]		A"			#area
 	Cd:		"float[]		Cd"		#coefficiency of drag
 	rho:		"float[]		rho"		#fluid density
@@ -22,6 +36,24 @@ class ParticleType:
 	radius:	"float[]		radius"	#radius (OKLab units)
 	clipped:	"bool[]		clipped"	#previous tick, was outside gamut boundary
 	stress:	"float[]		stress"	#previous tick, neighbors spring force sum
+
+	def __init__(self, point_list, start_radius):
+		D = self.DEF
+		p_count = len(point_list)
+		self.pos			= point_list.points["color"].copy()
+		self.fixed		= point_list.points["fixed"].copy()
+		self.v			= np.zeros((p_count, 3)) + D.v
+		self.v_mag		= np.full(p_count , OkTools.vec3Length(D.v) )
+		self.A			= np.full(p_count , D.A 			)
+		self.Cd			= np.full(p_count , D.Cd			)
+		self.rho			= np.full(p_count , D.rho			)
+		self.m			= np.full(p_count , D.m				)
+		self.k			= np.full(p_count , D.k				)
+		self.COR			= np.full(p_count , D.COR			)
+		self.mu			= np.full(p_count , D.mu			)
+		self.radius		= np.full(p_count , start_radius	)
+		self.clipped	= np.full(p_count , D.clipped		)
+		self.stress		= np.full(p_count , D.stress 		)
 
 	def __len__(self):
 		return len(self.pos)
@@ -43,13 +75,12 @@ class ParticleSim:
 		"""
 
 		beyond_radius = neighbors_dist > radius[:,None]
-		spring_constant = spring_constant[:, None]
-		spring_constant = np.where(beyond_radius, attraction_force, spring_constant)
+		spring_k_array = np.where(beyond_radius, attraction_force, spring_constant[:, None])
 
 		delta_x = np.zeros_like(neighbors_dist)
 		delta_x[n_valid_idxs] = neighbors_dist[n_valid_idxs]
 		delta_x = delta_x - radius[:,None] * n_valid_idxs
-		spring_mag = -1.0 * spring_constant * delta_x #f=-kx
+		spring_mag = -1.0 * spring_k_array * delta_x #f=-kx
 		spring_force = neighbors_norm*spring_mag[:,:,None]
 		spring_force = np.sum(spring_force,axis=1)
 		spring_mag = np.sum(spring_mag,axis=1)
@@ -192,10 +223,10 @@ class ParticleSim:
 		return new_pos
 
 	#higher smoothing = bias toward prev_dt if dt increases
-	def calcTimeStep(self, velocity, prev_dt, max_move, smoothing, max_dt, min_dt):
+	def calcTimeStep(self, velocity_mag, prev_dt, max_move, smoothing, max_dt, min_dt):
 		"""
 		float calcTimeStep(
-			float[][3] velocity,
+			float[] velocity_mag,
 			float prev_dt,
 			float max_move,
 			float smoothing,
@@ -203,8 +234,7 @@ class ParticleSim:
 			float min_dt
 		)
 		"""
-		v_approx = OkTools.manhattanDistance(velocity)
-		max_v = np.max(v_approx)
+		max_v = np.max(velocity_mag)
 
 		new_dt=max_dt
 		if max_v != 0.0:
@@ -216,32 +246,11 @@ class ParticleSim:
 
 		return new_dt
 
-	def calcTotalEnergy(self, particles):
-		"""float calcTotalEnergy(ParticleType particles)"""
-		kE = 0.5 * particles.m * np.linalg.norm(particles.v,axis=1)**2
+	def calcTotalEnergy(self, mass, velocity_mag):
+		"""float calcTotalEnergy(float[] mass, float[] velocity_mag)"""
+		kE = 0.5 * mass * velocity_mag
 		total_energy = np.sum(kE,axis=0)
 		return total_energy
-
-	def createParticles(self, point_list: PointList, start_radius: float):
-		"""ParticleType createParticles(PointList point_list, float start_radius)"""
-		p_count = point_list.length()
-		particle_list = ParticleType(
-			pos		= point_list.points["color"],
-			fixed	 	= point_list.points["fixed"],
-			v		 	= np.zeros((p_count,3)	),
-			A		 	= np.full(p_count ,math.pi * (0.1)**2 ),
-			Cd		 	= np.full(p_count ,0.47 ),
-			rho		= np.full(p_count ,3.0 	),
-			m		 	= np.full(p_count ,0.4 	),
-			k		 	= np.full(p_count ,0.4 	),
-			COR		= np.full(p_count ,0.8 	),
-			mu		 	= np.full(p_count ,0.2 	),
-			radius	= np.full(p_count ,start_radius ),
-			clipped	= np.full(p_count ,False ),
-			stress	= np.full(p_count ,0.0 	),
-		)
-
-		return particle_list
 
 	"""
 	Relations
@@ -255,9 +264,9 @@ class ParticleSim:
 	def relaxCloud(self,
 		point_list,
 		approx_radius,
-		iterations = 64,
-		record_frames = None,
-		log_frequency = 32,
+		iterations = 256,
+		record_frame_path = None,
+		log_frequency = 64,
 		max_r_change = 0.1, #max change in radius per 1 sim_dt
 		anneal_steps = None
 	):
@@ -266,7 +275,7 @@ class ParticleSim:
 			PointList point_list,
 			float approx_radius,
 			int iterations,
-			string record_frames,
+			string record_frame_path,
 			int log_frequency,
 			float max_r_change
 			int anneal_steps
@@ -278,14 +287,17 @@ class ParticleSim:
 
 		if anneal_steps == None:
 			anneal_steps = max(1, min(iterations//16, 16))
+		relax_end_steps = 4*anneal_steps #Allow start and end relax longer 
 
-		search_radius = 1.2
-		particles = self.createParticles(point_list, approx_radius)
+		particles = ParticleType(point_list, approx_radius)
 
-		if record_frames:
-			particle_frames=np.empty((iterations+1, len(particles), 3), dtype=np.float32)
-			particle_frames[0] = particles.pos
-			particle_frame_idx=1
+		if record_frame_path:
+			record_frequency_dt = 1.0 #save frame every N sim_dt
+
+			particle_frames = []
+			frame = particles.pos.astype(np.float32)
+			particle_frames.append(frame)
+			last_record_time = 0.0
 
 		#min,median,max radius of particles.radius
 		#med,max are only for debug logging
@@ -293,15 +305,18 @@ class ParticleSim:
 		min_r,med_r,max_r = [approx_radius]*3
 
 		#time delta vars
+		sim_smoothing = 0.5
+		sim_max_dt = 0.5
+		sim_min_dt = 0.01
 		max_radius_move = 1.0 #how many min_r any particle can move in 1.0 sim_dt
 		max_global_move = 0.25 #maximum units that particle can move, gamut is ~1x1x1 cube
 		sim_dt = 0.1 #simulation time step
 		sim_time_elapsed = 0.0
 
 		#point_tree cache
+		search_radius = 1.2
 		last_tree_pos = [1e10]*3 #force first update
 		tree_update_threshold = 0.5 #e.g. 0.5 means when any particle moves 0.5x of its radius, point_tree is updated  
-		point_tree_refresh_time = -1e8
 		neighbors_count = None
 		n_pad_idxs = None
 		n_valid_idxs = None
@@ -312,9 +327,8 @@ class ParticleSim:
 			all_forces=[]
 
 			#Only update particle neighbors when any particle has moved <tree_update_threshold> of its radius
-			move_in_radius = OkTools.manhattanDistance(particles.pos - last_tree_pos, axis=1) / (particles.radius + 1e-100)
+			move_in_radius = OkTools.vec3Length(particles.pos - last_tree_pos, axis=1) / (particles.radius + 1e-12)
 			if np.max(move_in_radius) > tree_update_threshold:
-				point_tree_refresh_time = sim_time_elapsed
 				last_tree_pos = particles.pos.copy()
 
 				n_pad_idxs, n_valid_idxs, neighbors_count = self.updateParticleNeighbors(particles, search_radius)
@@ -328,9 +342,11 @@ class ParticleSim:
 				neighbors_dist_vec = particles.pos[:,None] - particles.pos[n_pad_idxs] #(point_count,neighbors_count,3)
 				neighbors_dist_vec[~n_valid_idxs] = [0,0,0] #mark invalid
 
-				neighbors_norm, neighbors_dist = OkTools.vec3_arrayNorm(neighbors_dist_vec, axis=2)
-				neighbors_norm[~n_valid_idxs] = [0,0,0]
-				neighbors_dist[~n_valid_idxs] = np.inf #mark invalid
+				neighbors_norm = np.zeros_like(neighbors_dist_vec) #init as invalid
+				neighbors_dist = np.full(neighbors_dist_vec.shape[:2], np.inf)
+
+				valid_n_dist_vec = neighbors_dist_vec[n_valid_idxs]
+				neighbors_norm[n_valid_idxs], neighbors_dist[n_valid_idxs] = OkTools.vec3ArrayNorm( valid_n_dist_vec )
 
 				#jitter + spring
 				neighbor_force, neighbor_force_mag = self.calcNeighborsForce(particles.radius, particles.k, n_pad_idxs, n_valid_idxs, neighbors_dist, neighbors_norm)
@@ -359,9 +375,9 @@ class ParticleSim:
 
 
 			## Drag, opposing #Fd=0.5*p*A*Cd*v^2
-			v_approx = OkTools.manhattanDistance(particles.v)[:,None] * particles.v
+			particles.v_mag = OkTools.vec3Length(particles.v, axis=1)
 			drag_factors = 0.5 * particles.rho * particles.A * particles.Cd
-			drag_force = -1.0 * drag_factors[:,None] * v_approx
+			drag_force = -1.0 * drag_factors[:,None] * particles.v_mag[:,None] * particles.v #approx (v_mag * v_norm)**2
 			all_forces.append(drag_force)
 
 			## Internal friction, opposing
@@ -387,11 +403,10 @@ class ParticleSim:
 				non_zero_move = np.any(clip_move, axis=1)
 				particles.clipped = non_zero_move
 
-				surface_norm, _ = OkTools.vec3_arrayNorm(clip_move[non_zero_move])
+				surface_norm, _ = OkTools.vec3ArrayNorm(clip_move[non_zero_move])
 				particles.v[non_zero_move] = self.calcReflectVelocity(particles.v[non_zero_move], particles.COR[non_zero_move], surface_norm)
 
 			## Adaptive radius scale
-			relax_end_steps = 4*anneal_steps #Allow start and end relax longer 
 			if(
 				iterations-tick >= relax_end_steps and #last trigger
 				tick >= relax_end_steps and #first
@@ -400,26 +415,26 @@ class ParticleSim:
 				particles.radius = self.calcParticleRadius(particles, n_pad_idxs, n_valid_idxs, neighbors_count, max_r_change, sim_dt)
 				min_r = round(np.min(particles.radius),print_precision)
 
-
 			## Update timestep
 			sim_time_elapsed+=sim_dt
 			sim_dt = self.calcTimeStep(
-				particles.v, 
+				particles.v_mag, 
 				sim_dt, 
 				max_move = min(max_global_move, max_radius_move * min_r),
-				smoothing=0.5, 
-				max_dt = 0.5, 
-				min_dt = 0.01
+				smoothing = sim_smoothing, 
+				max_dt = sim_max_dt, 
+				min_dt = sim_min_dt
 			)
 		
 
 			## Logging
-			if record_frames:
-				particle_frames[particle_frame_idx] = particles.pos.astype(np.float32)
-				particle_frame_idx += 1
+			if record_frame_path and (sim_time_elapsed - last_record_time >= record_frequency_dt):
+				last_record_time+= record_frequency_dt #mitigate time overshooting by accumulation
+				frame = particles.pos.astype(np.float32)
+				particle_frames.append(frame)
 
 			if tick%log_frequency==0 or tick==iterations-1:
-				total_energy=self.calcTotalEnergy(particles)
+				total_energy=self.calcTotalEnergy(particles.m, particles.v_mag)
 				out_str = "DT: " + str(round(sim_dt,print_precision)) + " Total energy["+str(round(sim_time_elapsed,print_precision))+"]:"
 				out_str+= " "+str(total_energy)
 				print(out_str)
@@ -428,9 +443,10 @@ class ParticleSim:
 				max_r = round(np.max(particles.radius),print_precision)
 				print("P: minr " + str(min_r) + " medr" + str(med_r) + " maxr" + str(max_r))
 		
-		if record_frames:
+		if record_frame_path:
 			print("Writing particle_frames... ")
-			np.save(record_frames, particle_frames[:particle_frame_idx])
+			npy_frames = np.array(particle_frames, dtype=np.float32)
+			np.save(record_frame_path, npy_frames)
 
 		print("relaxCloud Done\n")
 		point_list.points["color"] = particles.pos

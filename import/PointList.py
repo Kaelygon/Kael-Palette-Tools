@@ -4,6 +4,7 @@ import numpy as np
 from PIL import Image
 from dataclasses import dataclass, field
 from typing import List, Optional
+from oklabConversion import *
 
 
 PointType = [
@@ -33,6 +34,9 @@ class PointList:
 
 	#public
 
+	def __len__(self):
+		return len(self.points["color"])
+
 	#add new element at end of self.points
 	def push(self, color, alpha, fixed):
 		"""void push(float[3] color, float alpha, bool fixed)"""
@@ -42,10 +46,6 @@ class PointList:
 	def remove(self, idx):
 		"""void remove(int idx)"""
 		self.points = np.delete(self.points, idx, axis=0)
-
-	def length(self):
-		"""void length(void)"""
-		return len(self.points)
 
 	def concat(self, new_list, silent=False):
 		"""void concat(PointList new_list, bool silent=false)"""

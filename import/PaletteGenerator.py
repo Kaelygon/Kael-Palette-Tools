@@ -69,7 +69,7 @@ class PointSampler:
 		output_list = PointList("oklab") 
 
 		attempts=0
-		while output_list.length() < point_count:
+		while len(output_list) < point_count:
 			attempts+=1
 			if attempts > max_attempts:
 				break
@@ -86,19 +86,20 @@ class PointSampler:
 			#discard if too close
 			#query np_points vs (original + previous)
 			accepted_points = np.concatenate( [point_list.points["color"], output_list.points["color"]] ) #original points + previous iter
-			point_tree = cKDTree(accepted_points)
-			dists, _ = point_tree.query(np_points, k=1) 
-			not_near = dists >= min_dist
-			np_points = np_points[not_near]
+			if accepted_points.size:
+				point_tree = cKDTree(accepted_points)
+				dists, _ = point_tree.query(np_points, k=1) 
+				not_near = dists >= min_dist
+				np_points = np_points[not_near]
 
-			if len(np_points) == 0:
-				continue
+				if len(np_points) == 0:
+					continue
 
-			#query np_points vs np_points
-			point_tree = cKDTree(np_points)
-			dists, _ = point_tree.query(np_points, k=2) 
-			not_near = dists[:,1] >= min_dist #[:,0] is itself
-			np_points = np_points[not_near]
+				#query np_points vs np_points
+				point_tree = cKDTree(np_points)
+				dists, _ = point_tree.query(np_points, k=2) 
+				not_near = dists[:,1] >= min_dist #[:,0] is itself
+				np_points = np_points[not_near]
 
 			#concat
 			accepted_list = PointList("oklab", len(np_points)) 
@@ -243,14 +244,14 @@ class PaletteGenerator:
 		palette_list.concat(gray_points)
 
 		#poisson points
-		empty_point_count = preset.max_colors - palette_list.length()
+		empty_point_count = preset.max_colors - len(palette_list)
 		empty_point_count = max(0,empty_point_count)
 		if preset.sample_method in [0,2] and empty_point_count>0:
 			poisson_points = PointSampler.poissonReject( palette_list, point_radius*0.51, empty_point_count, preset.max_attempts )
 			palette_list.concat(poisson_points)
 
 		#zero points
-		empty_point_count = preset.max_colors - palette_list.length()
+		empty_point_count = preset.max_colors - len(palette_list)
 		empty_point_count = max(0,empty_point_count)
 		if preset.sample_method in [1,2] and empty_point_count>0:
 			zero_points = PointSampler.zero(preset, empty_point_count)
@@ -264,7 +265,7 @@ class PaletteGenerator:
 			point_list = palette_list,
 			iterations=preset.relax_count,
 			approx_radius = point_radius,
-			record_frames = histogram_path,
+			record_frame_path = histogram_path,
    	)
 
 		palette_list = PaletteGenerator._applyColorLimits(preset, palette_list)
@@ -274,8 +275,8 @@ class PaletteGenerator:
 
 	@staticmethod
 	def saveAsImage(preset: PalettePreset, point_list: PointList, filename: str = "palette.png"):
-		p_count = point_list.length()
-		if(point_list.length()==0):
+		p_count = len(point_list)
+		if(len(point_list)==0):
 			return
 
 		rgba = np.zeros((p_count,4))

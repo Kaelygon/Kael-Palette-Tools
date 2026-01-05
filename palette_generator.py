@@ -21,7 +21,7 @@ def run_PaletteGenerator(preset, output_file, histogram_file):
 	PaletteGenerator.saveAsImage(preset, palette_list, output_file)
 
 	PointListStats.printGapStats(palette_list,4)
-	print("Generated "+str(palette_list.length() + preset.reserve_transparent)+" colors to "+output_file)
+	print("Generated "+str(len(palette_list) + preset.reserve_transparent)+" colors to "+output_file)
 
 
 if __name__ == '__main__':
@@ -32,7 +32,7 @@ if __name__ == '__main__':
 			img_fixed_mask = None, #"output/pal64-fixed.png",
 
 			gray_count	=6, 
-			max_colors	=64, 
+			max_colors	=256, 
 			hue_count	=12,
 			min_sat		=0.0, 
 			max_sat		=1.0, 
@@ -41,7 +41,7 @@ if __name__ == '__main__':
 		
 			packing_fac	=1.2,
 			max_attempts=1024,
-			relax_count =512,
+			relax_count =1024,
 			seed=0
 		)
 

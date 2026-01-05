@@ -9,26 +9,20 @@ class OkTools:
 	FALLBACK_NORM = np.array([0.57735026918962576451]*3) * [1,-1,1] #sqrt(1/3)
 
 	@staticmethod
-	def manhattanDistance(vec, axis=1, keepdims=False):
-		"""float[...] manhattanDistance(float[...] vec, int axis=1, bool keepdims=false)"""
-		l_ratio = 0.66666666666666666667 # dist_exact/sum(abs(x,y,z)) = ~2/3 in 3D
-		return np.sum(np.abs(vec), keepdims=keepdims, axis=axis) * l_ratio
+	def vec3Length(vector_list, axis=-1, keepdims=False):
+		"""float[...,1] vec3Length(float[...,3] vector_list, int axis=1, bool keepdims=false)"""
+		sq_sum = np.einsum('...i,...i->...', vector_list, vector_list)
+		if keepdims:
+			sq_sum = np.expand_dims(sq_sum, axis=axis)
+		return np.sqrt(sq_sum)
 
 	@staticmethod
-	def vec3_arrayNorm(vector_list, axis=1):
-		"""float[...] vec3_arrayNorm(float[...] vector_list, int axis=1, bool keepdims=false)"""
-		l = np.linalg.norm(vector_list, axis=axis, keepdims=True)
+	def vec3ArrayNorm(vector_list, axis=-1):
+		"""float[...,3] vec3ArrayNorm(float[...,3] vector_list, int axis=1, bool keepdims=false)"""
+		l = OkTools.vec3Length(vector_list, axis=axis, keepdims=True)
 		norm = vector_list / (l + 1e-12)
 		norm[np.all(vector_list == 0, axis=axis)] = OkTools.FALLBACK_NORM
 		return norm, np.squeeze(l, axis=-1)
-
-	@staticmethod
-	def vec3_norm(vector):
-		"""float[3] vec3_norm(float[3] vector))"""
-		l = np.linalg.norm(vector)
-		if l==0:
-			return OkTools.FALLBACK_NORM
-		return vector/l
 
 	@staticmethod
 	def inOklabGamut(lab_list, eps = 1e-12):

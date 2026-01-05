@@ -13,13 +13,14 @@ from PointListStats import *
 def run_PaletteGenerator(preset : PalettePreset, output_file, histogram_file):
 	np.random.seed(preset.seed)
 
-	point_list = PaletteGenerator.populatePointList(preset, histogram_file)
-	point_list = PaletteGenerator.sortPalette(preset, point_list)
+	palette_list = PointList("oklab")
+	palette_list = PaletteGenerator.populatePointList(preset, palette_list, histogram_file)
+	palette_list = PaletteGenerator.sortPalette(preset, palette_list)
 
-	PaletteGenerator.saveAsImage(preset, point_list, output_file)
+	PaletteGenerator.saveAsImage(preset, palette_list, output_file)
 
-	PointListStats.printGapStats(point_list,4)
-	print("Generated "+str(point_list.length() + preset.reserve_transparent)+" colors to "+output_file)
+	PointListStats.printGapStats(palette_list,4)
+	print("Generated "+str(palette_list.length() + preset.reserve_transparent)+" colors to "+output_file)
 
 
 if __name__ == '__main__':
@@ -30,7 +31,7 @@ if __name__ == '__main__':
 			img_fixed_mask = None, #"output/pal64-fixed.png",
 
 			gray_count	=6, 
-			max_colors	=256, 
+			max_colors	=1024, 
 			hue_count	=12,
 			min_sat		=0.0, 
 			max_sat		=1.0, 
@@ -39,7 +40,7 @@ if __name__ == '__main__':
 		
 			packing_fac	=1.2,
 			max_attempts=1024,
-			relax_count =256,
+			relax_count =2048,
 			seed=0
 		)
 
@@ -48,7 +49,7 @@ if __name__ == '__main__':
 		os.makedirs(output_path)
 
 	palette_name = 'testPalette.png'
-	histogram_file = output_path + "/" + "cloudHistogram.py"
+	histogram_file = output_path + "/" + "cloudHistogram"
 	palette_file = output_path + "/" + palette_name
 
 	run_PaletteGenerator(preset_pal64, palette_file, histogram_file)

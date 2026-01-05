@@ -226,12 +226,10 @@ class PaletteGenerator:
 
 	#public
 	@staticmethod
-	def populatePointList(preset : PalettePreset, histogram_path: str = None):	
+	def populatePointList(preset : PalettePreset, palette_list: PointList, histogram_path: str = None):	
 		cell_size = approxOkGap(preset.max_colors)
 		point_radius = cell_size * preset.packing_fac
 		print("Using point_radius "+str(round(point_radius,4)))
-
-		palette_list = PointList("oklab")
 
 		#preset points
 		if preset.img_pre_colors != None:

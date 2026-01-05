@@ -1,4 +1,4 @@
-
+#palette_generator.py
 """
 	Generate uniform palette in OKLab gamut
 """
@@ -10,7 +10,8 @@ sys.path.insert(1, './import/')
 from PaletteGenerator import *
 from PointListStats import *
 
-def run_PaletteGenerator(preset : PalettePreset, output_file, histogram_file):
+def run_PaletteGenerator(preset, output_file, histogram_file):
+	"""void run_PaletteGenerator(PalettePreset preset, string output_file, string histogram_file)""" 
 	np.random.seed(preset.seed)
 
 	palette_list = PointList("oklab")
@@ -25,13 +26,13 @@ def run_PaletteGenerator(preset : PalettePreset, output_file, histogram_file):
 
 if __name__ == '__main__':
 	preset_pal64 = PalettePreset(
-			sample_method=2,
-			reserve_transparent=1,
+			sample_method=0,
+			reserve_transparent=0,
 			img_pre_colors = None, #"output/pal64-base.png",
 			img_fixed_mask = None, #"output/pal64-fixed.png",
 
 			gray_count	=6, 
-			max_colors	=1024, 
+			max_colors	=64, 
 			hue_count	=12,
 			min_sat		=0.0, 
 			max_sat		=1.0, 
@@ -40,7 +41,7 @@ if __name__ == '__main__':
 		
 			packing_fac	=1.2,
 			max_attempts=1024,
-			relax_count =2048,
+			relax_count =512,
 			seed=0
 		)
 

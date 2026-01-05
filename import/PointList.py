@@ -1,3 +1,4 @@
+#PointList.py
 import math
 import numpy as np
 from PIL import Image
@@ -14,6 +15,8 @@ PointType = [
 #SoA point cloud to replace pointGrid+KaelColor
 @dataclass
 class PointList:
+	"""void PointList(string color_space, int point_count = 0)"""
+
 	TYPE_STR = ("srgb","linear","oklab")
 	INVALID_COL = (1.0,0.0,0.5)
 
@@ -31,15 +34,21 @@ class PointList:
 	#public
 
 	#add new element at end of self.points
-	def push(self, color, alpha=1.0, fixed=True):
+	def push(self, color, alpha, fixed):
+		"""void push(float[3] color, float alpha, bool fixed)"""
 		new_point = np.array([(color, alpha, fixed)], dtype=PointType)
 		self.points = np.concatenate([self.points, new_point])
 
 	def remove(self, idx):
+		"""void remove(int idx)"""
 		self.points = np.delete(self.points, idx, axis=0)
 
 	def length(self):
+		"""void length(void)"""
 		return len(self.points)
 
-	def concat(self, new_list):
+	def concat(self, new_list, silent=False):
+		"""void concat(PointList new_list, bool silent=false)"""
+		if (self.type != new_list.type) and (silent==False):
+			print("Warning: concatenating different types")
 		self.points = np.concatenate([self.points, new_list.points])

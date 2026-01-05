@@ -1,27 +1,27 @@
+#ParticleSim.py
 import math
 from dataclasses import dataclass, fields
 import numpy as np
 from scipy.spatial import cKDTree
-from numpy.typing import NDArray
 
 from OkTools import *
 from PointList import *
 
 @dataclass
 class ParticleType:
-	pos: 		NDArray[[np.float64]*3]	#position
-	fixed: 	NDArray[bool ]				#is immovable?
-	v: 		NDArray[[np.float64]*3]	#velocity
-	A: 		NDArray[float]				#area
-	Cd: 		NDArray[float]				#coefficiency of drag
-	rho: 		NDArray[float]				#fluid density
-	m: 		NDArray[float]				#mass
-	k: 		NDArray[float]				#spring constant
-	COR: 		NDArray[float]				#coefficiency of restitution
-	mu: 		NDArray[float]				#internal friction
-	radius: 	NDArray[float]				#radius (OKLab units)
-	clipped: NDArray[bool ]				#previous tick, was outside gamut boundary
-	stress: 	NDArray[float]				#previous tick, neighbors spring force sum
+	pos:		"float[][]3	pos"		#position
+	fixed:	"float[]		fixed"	#is immovable?
+	v:			"float[][3]	v"			#velocity
+	A:			"float[]		A"			#area
+	Cd:		"float[]		Cd"		#coefficiency of drag
+	rho:		"float[]		rho"		#fluid density
+	m:			"float[]		m"			#mass
+	k:			"float[]		k"			#spring constant
+	COR:		"float[]		COR"		#coefficiency of restitution
+	mu:		"float[]		mu"		#internal friction
+	radius:	"float[]		radius"	#radius (OKLab units)
+	clipped:	"bool[]		clipped"	#previous tick, was outside gamut boundary
+	stress:	"float[]		stress"	#previous tick, neighbors spring force sum
 
 	def __len__(self):
 		return len(self.pos)
@@ -29,15 +29,19 @@ class ParticleType:
 class ParticleSim:
 	"""Physics based spring/collision simulator to distribute points."""
 
-	#Too far: attract, Too close: repel # f=-kx (single particle)
-	def calcSpringForce(self, 
-		radius: NDArray[[float]], 
-		spring_constant: NDArray[[float]], 
-		n_valid_idxs: list[[bool]], 
-		neighbors_dist: NDArray[[float]], 
-		neighbors_norm: NDArray[[float]*3],
-		attraction_force: float = 0.0
-	):
+	#Calculate spring force from list of neighbor dist and norm 
+	def calcSpringForce(self, radius, spring_constant, n_valid_idxs, neighbors_dist, neighbors_norm, attraction_force = 0.0 ):
+		"""
+		(spring_force float[][3], spring_mag float[]) calcSpringForce(self, 
+			float[]	 		radius,
+			float[]	 		spring_constant,
+			bool[][] 		n_valid_idxs,
+			float[][] 		neighbors_dist,
+			float[][][3] 	neighbors_norm,
+			float				attraction_force,
+		)
+		"""
+
 		beyond_radius = neighbors_dist > radius[:,None]
 		spring_constant = spring_constant[:, None]
 		spring_constant = np.where(beyond_radius, attraction_force, spring_constant)
@@ -49,44 +53,53 @@ class ParticleSim:
 		spring_force = neighbors_norm*spring_mag[:,:,None]
 		spring_force = np.sum(spring_force,axis=1)
 		spring_mag = np.sum(spring_mag,axis=1)
-		return spring_force, spring_mag #(point_coint, 3) (point_coint)
+		return spring_force, spring_mag
 
-	def moveToVelocity(self, move_delta: NDArray[[float]*3], time_delta: float):
+	def moveToVelocity(self, move_delta, time_delta):
+		"""float[][3] moveToVelocity(float[][3] move_delta, float time_delta)"""
 		return move_delta / time_delta #v = dx/dt
 	
-	def velocityToForce(self, mass: NDArray[[float]], velocity: NDArray[[float]*3], time_delta: float):
+	def velocityToForce(self, mass, velocity, time_delta):
+		"""float[][3] velocityToForce(float[] mass, float[][3] velocity, float time_delta)"""
 		return velocity * mass[:,None] / time_delta #f = dv*m/dt
 	
-	def forceToVelocity(self, mass: NDArray[[float]], force: NDArray[[float]*3], time_delta: float):
+	def forceToVelocity(self, mass, force, time_delta):
+		"""float[][3] forceToVelocity(float[] mass, float[][3] force, float time_delta)"""
 		velocity = force * time_delta / mass[:,None] #dv = f*dt/m
 		return velocity
 
-	def forceToAcceleration(self, mass: NDArray[[float]], force: NDArray[[float]*3]):
+	def forceToAcceleration(self, mass, force):
+		"""float[][3] forceToAcceleration(float[] mass, float[][3] force)"""
 		acceleration = force / mass[:,None] #a=f/m
 		return acceleration
 
 	#force from distance moved in time step. f=m*((dx/dt)/dt)
-	def moveToForce(self, mass: NDArray[[float]], move_delta: NDArray[[float]*3], time_delta: float):
+	def moveToForce(self, mass, move_delta, time_delta):
+		"""float[][3] moveToForce(float[] mass, float[][3] move_delta, float time_delta)"""
 		velocity = self.moveToVelocity(move_delta, time_delta) #v = dx/dt
 		force = self.velocityToForce(mass, velocity, time_delta)
 		return force
 
 	#returns reflected velocity  # f = - 2 * (vec . n) * n
-	def calcReflectVelocity(self, velocity: NDArray[[float]*3], COR: NDArray[[float]], surface_norm: NDArray[[float]*3]):
+	def calcReflectVelocity(self, velocity, COR, surface_norm):
+		"""float[][3] calcReflectVelocity(float[][3] velocity, float[] COR, float[][3] surface_norm)"""
 		dot_v = np.sum(velocity*surface_norm, axis=1) #(vec . n)
 		reflected_v = -1.0 * (COR+1.0) * dot_v # - 2 * (vec . n)
 		reflected_v = reflected_v[:,None] * surface_norm # - 2 * (vec . n) * n
 		velocity = velocity + reflected_v
 		return velocity
 
-	def calcNeighborsForce(self, 
-		radius: NDArray[[float]], 
-		spring_constant: NDArray[[float]], 
-		n_pad_idxs: list[[int]],  
-		n_valid_idxs: list[[bool]], 
-		neighbors_dist: NDArray[[float]], 
-		neighbors_norm: NDArray[[float]*3]
-	):
+	def calcNeighborsForce(self, radius, spring_constant, n_pad_idxs, n_valid_idxs, neighbors_dist, neighbors_norm):
+		"""
+		(float[][3] float[]) calcNeighborsForce(
+			float[] radius, 
+			float[] spring_constant, 
+			int[][] n_pad_idxs, 
+			bool[][] n_valid_idxs, 
+			float[][] neighbors_dist, 
+			float[][][3] neighbors_norm
+		)
+		"""
 		neighbor_force = np.zeros((len(radius),3))
 		
 		#random normal if exactly on top of neighbor
@@ -105,14 +118,17 @@ class ParticleSim:
 		return neighbor_force, force_mag
 
 	#Scale radius by comparing neighbor states
-	def calcParticleRadius(self, 
-		particles: ParticleType,
-		n_pad_idxs: NDArray[[int]], 
-		n_valid_idxs: NDArray[[bool]], 
-		neighbor_count: NDArray[int], 
-		max_r_change: float=0.2, 
-		time_delta: float=1.0
-	):
+	def calcParticleRadius(self, particles, n_pad_idxs, n_valid_idxs, neighbor_count, max_r_change, time_delta):
+		"""
+		float[] calcParticleRadius(
+			ParticleType particles, 
+			int[][] n_pad_idxs, 
+			bool[][] n_valid_idxs, 
+			int[] neighbor_count
+			float max_r_change, 
+			float time_delta
+		)
+		"""
 		output_radii = np.zeros_like(particles.radius)
 		no_neighbors = neighbor_count==0
 		scale_limit = particles.radius*max_r_change*time_delta #max radius change in time step
@@ -147,7 +163,8 @@ class ParticleSim:
 		output_radii = np.clip(output_radii,1e-20,2.0)
 		return output_radii
 
-	def updateParticleNeighbors(self, particles: ParticleType, search_radius: float):
+	def updateParticleNeighbors(self, particles, search_radius):
+		"""int[][] bool[][] int[] updateParticleNeighbors(ParticleType particles, float search_radius)"""
 		## Get neighbors of each point within its radius
 		point_tree = cKDTree(particles.pos)
 		neighbors_list = point_tree.query_ball_point(particles.pos, r=particles.radius * search_radius)
@@ -167,22 +184,26 @@ class ParticleSim:
 
 		return n_pad_idxs, n_valid_idxs, neighbors_count
 
-	def updateParticlePos(self, particles: ParticleType, time_delta: float):
+	def updateParticlePos(self, particles, time_delta):
+		"""float[][3] updateParticlePos(ParticleType particles, float time_delta)"""
 		movable_idxs = ~particles.fixed
 		delta_dist = particles.v * time_delta #dx = v * dt
 		new_pos = particles.pos + delta_dist * movable_idxs[:,None]
 		return new_pos
 
 	#higher smoothing = bias toward prev_dt if dt increases
-	def calcTimeStep(self, 
-		prev_dt: float, 
-		particles: ParticleType, 
-		max_move: float, 
-		smoothing: float = 0.5, 
-		max_dt: float = 0.5, 
-		min_dt: float = 0.01
-	):
-		v_approx = OkTools.manhattanDistance(particles.v)
+	def calcTimeStep(self, velocity, prev_dt, max_move, smoothing, max_dt, min_dt):
+		"""
+		float calcTimeStep(
+			float[][3] velocity,
+			float prev_dt,
+			float max_move,
+			float smoothing,
+			float max_dt,
+			float min_dt
+		)
+		"""
+		v_approx = OkTools.manhattanDistance(velocity)
 		max_v = np.max(v_approx)
 
 		new_dt=max_dt
@@ -195,12 +216,14 @@ class ParticleSim:
 
 		return new_dt
 
-	def calcTotalEnergy(self, particles: ParticleType):
+	def calcTotalEnergy(self, particles):
+		"""float calcTotalEnergy(ParticleType particles)"""
 		kE = 0.5 * particles.m * np.linalg.norm(particles.v,axis=1)**2
 		total_energy = np.sum(kE,axis=0)
 		return total_energy
 
 	def createParticles(self, point_list: PointList, start_radius: float):
+		"""ParticleType createParticles(PointList point_list, float start_radius)"""
 		p_count = point_list.length()
 		particle_list = ParticleType(
 			pos		= point_list.points["color"],
@@ -233,12 +256,23 @@ class ParticleSim:
 		point_list,
 		approx_radius,
 		iterations = 64,
-		min_energy = 0.0,
 		record_frames = None,
 		log_frequency = 32,
 		max_r_change = 0.1, #max change in radius per 1 sim_dt
 		anneal_steps = None
 	):
+		"""
+		PointList relaxCloud(
+			PointList point_list,
+			float approx_radius,
+			int iterations,
+			string record_frames,
+			int log_frequency,
+			float max_r_change
+			int anneal_steps
+		)
+		"""
+
 		if iterations == 0 or len(point_list.points) < 2:
 			return point_list #Can't do anything with 0 or 1 points
 
@@ -370,8 +404,8 @@ class ParticleSim:
 			## Update timestep
 			sim_time_elapsed+=sim_dt
 			sim_dt = self.calcTimeStep(
+				particles.v, 
 				sim_dt, 
-				particles, 
 				max_move = min(max_global_move, max_radius_move * min_r),
 				smoothing=0.5, 
 				max_dt = 0.5, 
@@ -393,13 +427,10 @@ class ParticleSim:
 				med_r = round(np.median(particles.radius),print_precision)
 				max_r = round(np.max(particles.radius),print_precision)
 				print("P: minr " + str(min_r) + " medr" + str(med_r) + " maxr" + str(max_r))
-				if abs(total_energy) < min_energy:
-					break
 		
 		if record_frames:
-			with open(record_frames, "w") as f:
-				print("Writing particle_frames... ")
-				np.save(record_frames, particle_frames[:particle_frame_idx])
+			print("Writing particle_frames... ")
+			np.save(record_frames, particle_frames[:particle_frame_idx])
 
 		print("relaxCloud Done\n")
 		point_list.points["color"] = particles.pos

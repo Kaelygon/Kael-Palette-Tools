@@ -1,3 +1,4 @@
+#PointListStats.py
 import math
 import numpy as np
 from scipy.spatial import cKDTree
@@ -10,7 +11,8 @@ from OkTools import *
 
 class PointListStats:
 	@staticmethod
-	def _printPairStats(color_list: np.ndarray, print_count: int, listName:str = "", precision: int = 4):
+	def _printPairStats(color_list, print_count, listName = "", precision = 4):
+		"""void _printPairStats(float[][3] color_list, int print_count, string listName = "", int precision = 4)"""
 		if len(color_list)<2:
 			return
 
@@ -81,7 +83,8 @@ class PointListStats:
 
 
 	@staticmethod
-	def printGapStats(point_list: PointList, print_count: int, listName:str = "", precision: int = 4):
+	def printGapStats(point_list, print_count = 4, listName = "", precision = 4):
+		"""void printGapStats(PointList point_list, int print_count = 4, string listName = "", int precision = 4)"""
 		color_list = point_list.points["color"]
 		is_gray = OkTools.isOkSrgbGray(color_list) 
 		gray_colors = color_list[is_gray] 

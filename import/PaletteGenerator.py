@@ -1,3 +1,4 @@
+#PaletteGenerator.py
 import math
 import numpy as np
 from scipy.spatial import cKDTree
@@ -21,8 +22,7 @@ from OkTools import *
 class PalettePreset:#
 	sample_method: int = 2
 
-	reserve_transparent: bool = True
-	hex_pre_colors: List[[str,bool]] = None # ["#0123abc",...]
+	reserve_transparent: int = 1
 	img_pre_colors: str = None #file name to existing color palette
 	img_fixed_mask: str = None #file name to fixed mask white=fixed black=movable color
 	
@@ -42,6 +42,8 @@ class PalettePreset:#
 	seed: int = 0 # 0=random run to run
 
 	def __post_init__(self):
+		self.reserve_transparent = max(0, min(1, self.reserve_transparent) )
+
 		if self.packing_fac <= 0:
 			self.packing_fac = 1e-12
 
@@ -244,7 +246,7 @@ class PaletteGenerator:
 		empty_point_count = preset.max_colors - palette_list.length()
 		empty_point_count = max(0,empty_point_count)
 		if preset.sample_method in [0,2] and empty_point_count>0:
-			poisson_points = PointSampler.poissonReject( palette_list, point_radius*0.51, empty_point_count )
+			poisson_points = PointSampler.poissonReject( palette_list, point_radius*0.51, empty_point_count, preset.max_attempts )
 			palette_list.concat(poisson_points)
 
 		#zero points
@@ -272,7 +274,11 @@ class PaletteGenerator:
 
 	@staticmethod
 	def saveAsImage(preset: PalettePreset, point_list: PointList, filename: str = "palette.png"):
-		rgba = np.zeros((preset.max_colors,4))
+		p_count = point_list.length()
+		if(point_list.length()==0):
+			return
+
+		rgba = np.zeros((p_count,4))
 
 		lab_list = point_list.points["color"]
 		rgba[:,:3] = oklabToSrgb(lab_list)
@@ -294,24 +300,26 @@ class PaletteGenerator:
 	def sortPalette(preset : PalettePreset, point_list : PointList):
 		color_list = point_list.points["color"]
 		is_gray = OkTools.isOkSrgbGray(color_list) 
-		gray_colors = color_list[is_gray] 
-		hued_colors = color_list[~is_gray]
 	
 		#bucket similar hues, sort each bucket by luminosity
 		hue_bucket_width = 2*math.pi * (1.0/preset.hue_count)
 
-		color_list_hue = np.atan2(hued_colors[:,2], hued_colors[:,1]) + 2* math.pi
+		color_list_hue = np.atan2(color_list[:,2], color_list[:,1]) + 2* math.pi
 		hue_bucket_idxs = color_list_hue/hue_bucket_width
 		hue_bucket_idxs = hue_bucket_idxs.astype(int) % preset.hue_count #hue_bucket_idxs[i] = hue_idx of color_list[i]
+		hue_bucket_idxs[is_gray] = -1
 
-		sorted_gray_colors = gray_colors[np.argsort(gray_colors[:, 0])]
-		sorted_colors = sorted_gray_colors
-		for idx in range(preset.hue_count):
-			hue_bucket = hued_colors[ np.where(hue_bucket_idxs==idx) ] #bucket colors with same hue_idx
-			hue_bucket = hue_bucket[np.argsort(hue_bucket[:, 0])] #sort bucket by luminosity
-			sorted_colors = np.concatenate([sorted_colors, hue_bucket])
+		sorted_idxs = np.array([],dtype=int)
+		for idx in range(-1, preset.hue_count):
+			this_bucket_idxs = np.where(hue_bucket_idxs==idx)[0] #bucket colors with same hue_idx
+			bucket_colors = color_list[this_bucket_idxs]
+			sorted_sub_idxs= np.argsort(bucket_colors[:, 0]) #sort bucket by luminosity
+			this_bucket_sorted_idxs = this_bucket_idxs[sorted_sub_idxs]
 
-		point_list.points["color"] = sorted_colors
+			sorted_idxs = np.concatenate([sorted_idxs, this_bucket_sorted_idxs])
+
+		point_list.points = point_list.points[sorted_idxs]
+		sorted_idxs = np.sort(sorted_idxs)
 		return point_list
 
 	#EOF PaletteGenerator

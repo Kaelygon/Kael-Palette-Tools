@@ -9,7 +9,7 @@ import os.path
 import sys
 sys.path.insert(1, './import/')
 from OrderedDither import *
-from oklabConversion import *
+from OkTools import *
 
 @dataclass
 class ConvertPreset:
@@ -123,7 +123,7 @@ class OkImage:
 		col_list = np.array(in_img, dtype=np.float64) / 255.0
 		col_list = col_list.reshape(-1, 4)
 		col_list[:,:3] = srgbToOklab(col_list[:,:3])
-		col_list[:,:3] = self._quantize(col_list[:,:3], int(1.0/OKLAB_8BIT_MARGIN))
+		col_list[:,:3] = self._quantize(col_list[:,:3], int(1.0/OkTools.OKLAB_8BIT_MARGIN))
 
 		self.pixels = col_list
 		self.pixels_output = self.pixels.copy()

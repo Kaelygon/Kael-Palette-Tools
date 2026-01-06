@@ -10,17 +10,18 @@ from PalettizeImage import *
 
 from PIL import ImageDraw, ImageFont
 
-def addImgHeader(in_img, metadata, header_h):
+def addImgHeader(in_img, metadata, header_w):
 	w, h = in_img.size
 
-	header_img = Image.new("RGBA", (w, header_h), (128,128,128,255))
+	gray_color = (128,128,128,255)
+	header_img = Image.new("RGBA", (header_w, h), gray_color)
 	draw = ImageDraw.Draw(header_img)
 	font = ImageFont.load_default()
 	draw.text((4, 4), metadata, fill=(0,0,0,255), font=font)
 
-	out_img = Image.new("RGBA", (w, h + header_h), (0,0,0,0))
-	out_img.paste(header_img, (0, 0))
-	out_img.paste(in_img, (0, header_h))
+	out_img = Image.new("RGBA", (w + header_w, h), (0,0,0,0))
+	out_img.paste(in_img, (0, 0))
+	out_img.paste(header_img, (w, 0))
 	return out_img
 
 def generateExample(_input, _palette):
@@ -76,14 +77,10 @@ def generateExample(_input, _palette):
 
 	concat_img = None
 
-	header_h = 6*16 #one line = 16px
+	header_h = 16*7 #one line = 16px
 	og_img = Image.open(_input).convert("RGBA")
 	metadata = (
-			"ORIGINAL" + "\n"
-			"python palettize_image.py \n" +
-			"--input=" 		+ str( _input ) + "\n" +
-			"--palette=" 	+ str( _palette ) + "\n" +
-			"--output=" 	+ concat_output + "\n"
+			"ORIGINAL"
 	)
 	og_img = addImgHeader(og_img, metadata, header_h)
 
@@ -107,7 +104,7 @@ def generateExample(_input, _palette):
 		if concat_img is None:
 			concat_img = np.array(img)
 		else:
-			concat_img = np.concatenate((concat_img, np.array(img)), axis=1)
+			concat_img = np.concatenate((concat_img, np.array(img)), axis=0)
 
 		os.remove(fname)
 

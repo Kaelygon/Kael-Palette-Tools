@@ -1,5 +1,4 @@
 import numpy as np
-from scipy.spatial import cKDTree as KDTree
 
 """
 ordered. namespace matrix creation tools

@@ -120,7 +120,7 @@ class ParticleSim:
 		velocity = velocity + reflected_v
 		return velocity
 
-	def calcNeighborsForce(self, radius, spring_constant, n_pad_idxs, n_valid_idxs, neighbors_dist, neighbors_norm):
+	def calcNeighborsForce(self, radius, spring_constant, n_pad_idxs, n_valid_idxs, neighbors_dist, neighbors_norm, rand):
 		"""
 		(float[][3] float[]) calcNeighborsForce(
 			float[] radius, 
@@ -128,23 +128,21 @@ class ParticleSim:
 			int[][] n_pad_idxs, 
 			bool[][] n_valid_idxs, 
 			float[][] neighbors_dist, 
-			float[][][3] neighbors_norm
+			float[][][3] neighbors_norm,
+			np.random.Generator rand
 		)
 		"""
-		neighbor_force = np.zeros((len(radius),3))
-		
 		#random normal if exactly on top of neighbor
 		zero_neighbor_dist = neighbors_dist==0 #if particle neighbor dists is 0
 		zero_neighbor_dist[~n_valid_idxs] = False #prune padding
 		inside_neighbor = np.any( zero_neighbor_dist, axis=1)
 		if np.any( inside_neighbor ):
 			inside_count = np.sum(zero_neighbor_dist)
-			rand_dir = np.random.rand(inside_count, 3) - 0.5 #not normalized
+			rand_dir = rand.random((inside_count, 3)) - 0.5 #not normalized
 			neighbors_norm[zero_neighbor_dist] = rand_dir
 
 		#spring forces
-		spring_force, force_mag = self.calcSpringForce(radius, spring_constant, n_valid_idxs, neighbors_dist, neighbors_norm)
-		neighbor_force+= spring_force
+		neighbor_force, force_mag = self.calcSpringForce(radius, spring_constant, n_valid_idxs, neighbors_dist, neighbors_norm)
 
 		return neighbor_force, force_mag
 
@@ -268,7 +266,8 @@ class ParticleSim:
 		record_frame_path = None,
 		log_frequency = 64,
 		max_r_change = 0.1, #max change in radius per 1 sim_dt
-		anneal_steps = None
+		anneal_steps = None,
+		rand = None
 	):
 		"""
 		PointList relaxCloud(
@@ -277,10 +276,13 @@ class ParticleSim:
 			int iterations,
 			string record_frame_path,
 			int log_frequency,
-			float max_r_change
-			int anneal_steps
+			float max_r_change,
+			int anneal_steps,
+			np.random.Generator rand
 		)
 		"""
+		if rand == None:
+			rand = np.random.Generator()
 
 		if iterations == 0 or len(point_list.points) < 2:
 			return point_list #Can't do anything with 0 or 1 points
@@ -349,7 +351,7 @@ class ParticleSim:
 				neighbors_norm[n_valid_idxs], neighbors_dist[n_valid_idxs] = OkTools.vec3ArrayNorm( valid_n_dist_vec )
 
 				#jitter + spring
-				neighbor_force, neighbor_force_mag = self.calcNeighborsForce(particles.radius, particles.k, n_pad_idxs, n_valid_idxs, neighbors_dist, neighbors_norm)
+				neighbor_force, neighbor_force_mag = self.calcNeighborsForce(particles.radius, particles.k, n_pad_idxs, n_valid_idxs, neighbors_dist, neighbors_norm, rand)
 				particles.stress = neighbor_force_mag
 				all_forces.append(neighbor_force)
 				
@@ -396,7 +398,8 @@ class ParticleSim:
 			particles.pos = self.updateParticlePos(particles, sim_dt)
 
 			## Gamut reflect and clip
-			particles.pos, clip_move = OkTools.clipToOklabGamut(particles.pos) # dx
+			#lower bound prevents point being trapped behind darkest black
+			particles.pos, clip_move = OkTools.clipToOklabGamut(particles.pos, lower_bound=OkTools.DARKEST_BLACK_LAB) 
 	
 			particles.clipped[:] = False
 			if clip_move is not None:

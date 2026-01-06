@@ -12,10 +12,9 @@ from PointListStats import *
 
 def run_PaletteGenerator(preset, output_file, histogram_file):
 	"""void run_PaletteGenerator(PalettePreset preset, string output_file, string histogram_file)""" 
-	np.random.seed(preset.seed)
 
 	palette_list = PointList("oklab")
-	palette_list = PaletteGenerator.populatePointList(preset, palette_list, histogram_file)
+	preset, palette_list = PaletteGenerator.populatePointList(preset, palette_list, histogram_file)
 	palette_list = PaletteGenerator.sortPalette(preset, palette_list)
 
 	PaletteGenerator.saveAsImage(preset, palette_list, output_file)

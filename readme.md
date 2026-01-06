@@ -70,3 +70,17 @@ Generates "./output/cloudHistogram.npy" which contains massive array of palette 
 python ok_plot_histogram.py
 ```
 Yank but it kinda works for debugging the results
+
+### Dependencies
+
+```
+argparse
+sys
+os
+math 
+numpy 
+dataclasses 
+PIL 
+scipy.spatial cKDTree
+numba
+```

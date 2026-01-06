@@ -4,13 +4,11 @@ import numpy as np
 from scipy.spatial import cKDTree
 from PIL import Image
 from dataclasses import dataclass, field
-from typing import List, Optional
 
 import sys
 sys.path.insert(1, './import/')
 
 from PointList import *
-from oklabConversion import *
 
 from ParticleSim import *
 from OkTools import *
@@ -19,8 +17,8 @@ from OkTools import *
 
 ### Palette generator ###
 @dataclass
-class PalettePreset:#
-	sample_method: int = 2
+class PalettePreset:
+	sample_method: int = 2 #0 = poisson_reject, 1 = random, 2 = poisson_reject + fallback random
 
 	reserve_transparent: int = 1
 	img_pre_colors: str = None #file name to existing color palette
@@ -39,7 +37,7 @@ class PalettePreset:#
 	max_attempts: int = 1024 #After this many max_attempts per point, point Sampler will give up
 	relax_count: int = 64 #number of relax iteration after point sampling
 	
-	seed: int = 0 # 0=random run to run
+	seed: int = None
 
 	def __post_init__(self):
 		self.reserve_transparent = max(0, min(1, self.reserve_transparent) )
@@ -59,6 +57,7 @@ class PointSampler:
 	#Simple rejection sampling
 	@staticmethod
 	def poissonReject(
+		rand: np.random.Generator,
 		point_list: PointList, 
 		min_dist: float, 
 		point_count: int, 
@@ -74,7 +73,7 @@ class PointSampler:
 			if attempts > max_attempts:
 				break
 
-			np_points = np.random.rand(batch_size, 3) - np.array([0.0, 0.5, 0.5])
+			np_points = rand.random((batch_size, 3))*OkTools.OKLAB_RANGE[:None] + OkTools.OKLAB_MIN
 
 			#discard outside gamut
 			in_gamut = OkTools.inOklabGamut(np_points)
@@ -86,7 +85,7 @@ class PointSampler:
 			#discard if too close
 			#query np_points vs (original + previous)
 			accepted_points = np.concatenate( [point_list.points["color"], output_list.points["color"]] ) #original points + previous iter
-			if accepted_points.size:
+			if accepted_points.size and min_dist != None:
 				point_tree = cKDTree(accepted_points)
 				dists, _ = point_tree.query(np_points, k=1) 
 				not_near = dists >= min_dist
@@ -130,8 +129,6 @@ class PointSampler:
 	#Generate grayscale gradient between black and white
 	@staticmethod
 	def grayscale(point_count: int = None, point_radius: float = None ):
-		darkest_black_srgb = [0.499/255,0.499/255,0.499/255] #brighest 8-bit SRGB rounded to pure black 
-		darkest_black_lab = srgbToOklab(np.array([darkest_black_srgb]))[0]
 
 		gray_list = PointList("oklab")
 
@@ -146,7 +143,7 @@ class PointSampler:
 
 				#Fade that brightest remains 1.0
 				scale = (denom-i)/denom
-				lum+= darkest_black_lab[0]*scale
+				lum+= OkTools.DARKEST_BLACK_LAB[0]*scale
 
 				gray_list.push([lum,0,0], 1.0, True)
 
@@ -229,7 +226,13 @@ class PaletteGenerator:
 
 	#public
 	@staticmethod
-	def populatePointList(preset : PalettePreset, palette_list: PointList, histogram_path: str = None):	
+	def populatePointList(preset : PalettePreset, palette_list: PointList, histogram_path: str = None):
+		if preset.seed == None:
+			preset.seed = np.random.SeedSequence().entropy
+		rand = np.random.default_rng(preset.seed)
+		
+		print("Using seed: " + str(preset.seed))
+
 		cell_size = approxOkGap(preset.max_colors)
 		point_radius = cell_size * preset.packing_fac
 		print("Using point_radius "+str(round(point_radius,4)))
@@ -247,15 +250,15 @@ class PaletteGenerator:
 		empty_point_count = preset.max_colors - len(palette_list)
 		empty_point_count = max(0,empty_point_count)
 		if preset.sample_method in [0,2] and empty_point_count>0:
-			poisson_points = PointSampler.poissonReject( palette_list, point_radius*0.51, empty_point_count, preset.max_attempts )
+			poisson_points = PointSampler.poissonReject( rand, palette_list, point_radius*0.51, empty_point_count, preset.max_attempts )
 			palette_list.concat(poisson_points)
 
-		#zero points
+		#fallback with no radius check
 		empty_point_count = preset.max_colors - len(palette_list)
 		empty_point_count = max(0,empty_point_count)
 		if preset.sample_method in [1,2] and empty_point_count>0:
-			zero_points = PointSampler.zero(preset, empty_point_count)
-			palette_list.concat(zero_points)
+			poisson_points = PointSampler.poissonReject( rand, palette_list, None, empty_point_count, 1000 )
+			palette_list.concat(poisson_points)
 
 		#truncate palette
 		palette_list.points = palette_list.points[:preset.max_colors]
@@ -266,11 +269,12 @@ class PaletteGenerator:
 			iterations=preset.relax_count,
 			approx_radius = point_radius,
 			record_frame_path = histogram_path,
+			rand = rand
    	)
 
 		palette_list = PaletteGenerator._applyColorLimits(preset, palette_list)
 
-		return palette_list
+		return preset, palette_list
 
 
 	@staticmethod

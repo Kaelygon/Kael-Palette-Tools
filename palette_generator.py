@@ -25,22 +25,24 @@ def run_PaletteGenerator(preset, output_file, histogram_file):
 
 if __name__ == '__main__':
 	preset_pal64 = PalettePreset(
-			sample_method=0,
-			reserve_transparent=0,
+			sample_method=2,
+			reserve_transparent=1,
 			img_pre_colors = None, #"output/pal64-base.png",
 			img_fixed_mask = None, #"output/pal64-fixed.png",
 
 			gray_count	=6, 
-			max_colors	=256, 
+			max_colors	=64, 
 			hue_count	=12,
 			min_sat		=0.0, 
 			max_sat		=1.0, 
 			min_lum		=0.0, 
 			max_lum		=1.0,
 		
-			packing_fac	=1.2,
-			max_attempts=1024,
-			relax_count =1024,
+			sample_radius = 1.0,
+			sample_attempts = 1024,
+
+			relax_radius = 1.2,
+			relax_count = 1024,
 			seed=0
 		)
 

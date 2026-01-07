@@ -86,30 +86,10 @@ class ParticleSim:
 		spring_mag = np.sum(spring_mag,axis=1)
 		return spring_force, spring_mag
 
-	def moveToVelocity(self, move_delta, time_delta):
-		"""float[][3] moveToVelocity(float[][3] move_delta, float time_delta)"""
-		return move_delta / time_delta #v = dx/dt
-	
-	def velocityToForce(self, mass, velocity, time_delta):
-		"""float[][3] velocityToForce(float[] mass, float[][3] velocity, float time_delta)"""
-		return velocity * mass[:,None] / time_delta #f = dv*m/dt
-	
-	def forceToVelocity(self, mass, force, time_delta):
-		"""float[][3] forceToVelocity(float[] mass, float[][3] force, float time_delta)"""
-		velocity = force * time_delta / mass[:,None] #dv = f*dt/m
-		return velocity
-
 	def forceToAcceleration(self, mass, force):
 		"""float[][3] forceToAcceleration(float[] mass, float[][3] force)"""
 		acceleration = force / mass[:,None] #a=f/m
 		return acceleration
-
-	#force from distance moved in time step. f=m*((dx/dt)/dt)
-	def moveToForce(self, mass, move_delta, time_delta):
-		"""float[][3] moveToForce(float[] mass, float[][3] move_delta, float time_delta)"""
-		velocity = self.moveToVelocity(move_delta, time_delta) #v = dx/dt
-		force = self.velocityToForce(mass, velocity, time_delta)
-		return force
 
 	#returns reflected velocity  # f = - 2 * (vec . n) * n
 	def calcReflectVelocity(self, velocity, COR, surface_norm):
@@ -119,32 +99,6 @@ class ParticleSim:
 		reflected_v = reflected_v[:,None] * surface_norm # - 2 * (vec . n) * n
 		velocity = velocity + reflected_v
 		return velocity
-
-	def calcNeighborsForce(self, radius, spring_constant, n_pad_idxs, n_valid_idxs, neighbors_dist, neighbors_norm, rand):
-		"""
-		(float[][3] float[]) calcNeighborsForce(
-			float[] radius, 
-			float[] spring_constant, 
-			int[][] n_pad_idxs, 
-			bool[][] n_valid_idxs, 
-			float[][] neighbors_dist, 
-			float[][][3] neighbors_norm,
-			np.random.Generator rand
-		)
-		"""
-		#random normal if exactly on top of neighbor
-		zero_neighbor_dist = neighbors_dist==0 #if particle neighbor dists is 0
-		zero_neighbor_dist[~n_valid_idxs] = False #prune padding
-		inside_neighbor = np.any( zero_neighbor_dist, axis=1)
-		if np.any( inside_neighbor ):
-			inside_count = np.sum(zero_neighbor_dist)
-			rand_dir = rand.random((inside_count, 3)) - 0.5 #not normalized
-			neighbors_norm[zero_neighbor_dist] = rand_dir
-
-		#spring forces
-		neighbor_force, force_mag = self.calcSpringForce(radius, spring_constant, n_valid_idxs, neighbors_dist, neighbors_norm)
-
-		return neighbor_force, force_mag
 
 	#Scale radius by comparing neighbor states
 	def calcParticleRadius(self, particles, n_pad_idxs, n_valid_idxs, neighbor_count, max_r_change, time_delta):
@@ -339,7 +293,6 @@ class ParticleSim:
 			## Neighbor forces
 			#Neighbor distances can be re-calculated even with a stale tree
 			#at worst the particles are beyond influence or barely touching points are ignored
-			neighbor_force = np.zeros_like(particles.v)
 			if np.any(n_valid_idxs):
 				neighbors_dist_vec = particles.pos[:,None] - particles.pos[n_pad_idxs] #(point_count,neighbors_count,3)
 				neighbors_dist_vec[~n_valid_idxs] = [0,0,0] #mark invalid
@@ -350,8 +303,18 @@ class ParticleSim:
 				valid_n_dist_vec = neighbors_dist_vec[n_valid_idxs]
 				neighbors_norm[n_valid_idxs], neighbors_dist[n_valid_idxs] = OkTools.vec3ArrayNorm( valid_n_dist_vec )
 
-				#jitter + spring
-				neighbor_force, neighbor_force_mag = self.calcNeighborsForce(particles.radius, particles.k, n_pad_idxs, n_valid_idxs, neighbors_dist, neighbors_norm, rand)
+				#random normal if exactly on top of neighbor
+				zero_neighbor_dist = neighbors_dist==0 #if particle neighbor dists is 0
+				zero_neighbor_dist[~n_valid_idxs] = False #prune padding
+				inside_neighbor = np.any( zero_neighbor_dist, axis=1)
+				if np.any( inside_neighbor ):
+					inside_count = np.sum(zero_neighbor_dist)
+					rand_dir = rand.random((inside_count, 3)) - 0.5 #not normalized
+					neighbors_norm[zero_neighbor_dist] = rand_dir
+
+				#spring forces
+				neighbor_force, neighbor_force_mag = self.calcSpringForce(particles.radius, particles.k, n_valid_idxs, neighbors_dist, neighbors_norm)
+
 				particles.stress = neighbor_force_mag
 				all_forces.append(neighbor_force)
 				
@@ -377,7 +340,6 @@ class ParticleSim:
 
 
 			## Drag, opposing #Fd=0.5*p*A*Cd*v^2
-			particles.v_mag = OkTools.vec3Length(particles.v, axis=1)
 			drag_factors = 0.5 * particles.rho * particles.A * particles.Cd
 			drag_force = -1.0 * drag_factors[:,None] * particles.v_mag[:,None] * particles.v #approx (v_mag * v_norm)**2
 			all_forces.append(drag_force)
@@ -392,7 +354,7 @@ class ParticleSim:
 			force_delta[particles.fixed] = [0,0,0] #ignore fixed
 			acceleration = self.forceToAcceleration(particles.m, force_delta)
 			particles.v = particles.v + acceleration * sim_dt
-
+			particles.v_mag = OkTools.vec3Length(particles.v, axis=1)
 
 			### Apply movement from velocity ###
 			particles.pos = self.updateParticlePos(particles, sim_dt)

@@ -21,7 +21,7 @@ def linearToSrgb(lin: np.ndarray):
 	return np.where(cutoff, lower, higher)
 
 def linearToOklab(lin: np.ndarray):
-	r, g, b = lin[:,0], lin[:,1], lin[:,2]
+	r, g, b = lin[...,0], lin[...,1], lin[...,2]
 	l = 0.4122214708*r + 0.5363325363*g + 0.0514459929*b
 	m = 0.2119034982*r + 0.6806995451*g + 0.1073969566*b
 	s = 0.0883024619*r + 0.2817188376*g + 0.6299787005*b
@@ -34,10 +34,10 @@ def linearToOklab(lin: np.ndarray):
 	a = 1.9779984951*l_ - 2.4285922050*m_ + 0.4505937099*s_
 	b = 0.0259040371*l_ + 0.7827717662*m_ - 0.8086757660*s_
 	
-	return np.stack([L,a,b], axis=1)
+	return np.stack([L,a,b], axis=-1)
 
 def oklabToLinear(lab: np.ndarray):
-	L, a, b = lab[:,0], lab[:,1], lab[:,2]
+	L, a, b = lab[...,0], lab[...,1], lab[...,2]
 	l_ = L + 0.3963377774*a + 0.2158037573*b
 	m_ = L - 0.1055613458*a - 0.0638541728*b
 	s_ = L - 0.0894841775*a - 1.2914855480*b
@@ -50,7 +50,7 @@ def oklabToLinear(lab: np.ndarray):
 	g = -1.2684380046*l + 2.6097574011*m - 0.3413193965*s
 	b = -0.0041960863*l - 0.7034186147*m + 1.7076147010*s
 	
-	return np.stack([r,g,b], axis=1)
+	return np.stack([r,g,b], axis=-1)
 
 def srgbToOklab(col: np.ndarray):
 	linRGB = srgbToLinear(col)
@@ -71,9 +71,9 @@ class OkTools:
 	OKLAB_8BIT_MARGIN =  7.011e-05  # minimum SRGB distance in oklab space
 	OKLAB_GAMUT_VOLUME =  0.05356533  # (oklab gamut) / (srgb gamut)
 
-	OKLAB_MIN =   np.array( [ 0.        , -0.23388758, -0.31152815] ) # OkLab bounding box
-	OKLAB_MAX =   np.array( [1.        , 0.2745663 , 0.19856976] )
-	OKLAB_RANGE = np.array( [1.        , 0.50845388, 0.51009792] )
+	OKLAB_BOX_MIN =   np.array( [ 0.        , -0.23388758, -0.31152815] ) # OkLab bounding box
+	OKLAB_BOX_MAX =   np.array( [1.        , 0.2745663 , 0.19856976] )
+	OKLAB_BOX_SIZE = np.array( [1.        , 0.50845388, 0.51009792] )
 
 	DARKEST_BLACK_LAB = srgbToOklab(np.array([[0.499/255,0.499/255,0.499/255]]))[0] #brighest 8-bit SRGB rounded to pure black 
 
@@ -99,19 +99,19 @@ class OkTools:
 	### Color Tools ###
 
 	@staticmethod
-	def inOklabGamut(lab_list, eps = 1e-12, lower_bound = 0.0, upper_bound = 1.0):
+	def inOklabGamut(lab_list, eps = 1e-12, lower_bound = 0.0, upper_bound = 1.0, axis=-1):
 		"""bool[] inOklabGamut(float[][3] lab_list, float eps = 1e-12, float lower_bound = 0.0, float upper_bound = 1.0 ))"""
 		lin_list = oklabToLinear(lab_list)
-		in_gamut = (lin_list >= lower_bound-eps) & (lin_list <= upper_bound+eps)
-		in_gamut = in_gamut.all(axis=1)
+		in_gamut = (lin_list > lower_bound-eps) & (lin_list < upper_bound+eps)
+		in_gamut = in_gamut.all(axis=axis)
 		return in_gamut
 
 	@staticmethod
-	def clipToOklabGamut(lab_list, eps = 1e-12, lower_bound = 0.0, upper_bound = 1.0):
+	def clipToOklabGamut(lab_list, eps = 1e-12, lower_bound = 0.0, upper_bound = 1.0, axis=-1):
 		"""(float[][3] float[][3]) clipToOklabGamut(float[][3] lab_list, float eps = 1e-12, float lower_bound = 0.0, float upper_bound))"""
 		lin_list = oklabToLinear(lab_list)
 		out_gamut = (lin_list < lower_bound-eps) | (lin_list > upper_bound+eps)
-		out_gamut = out_gamut.any(axis=1)
+		out_gamut = out_gamut.any(axis=axis)
 
 		if not np.any(out_gamut):
 			return lab_list, None

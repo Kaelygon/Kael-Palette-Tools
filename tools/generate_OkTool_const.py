@@ -9,7 +9,7 @@ sys.path.insert(1, './import/')
 
 from OkTools import *
 
-def createMeshGrid(size = 5):
+def createMeshGrid(size):
 	x = np.arange(size)
 	y = np.arange(size)
 	z = np.arange(size)

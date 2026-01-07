@@ -5,11 +5,11 @@ from PIL import Image
 from dataclasses import dataclass, field
 
 
-PointType = [
+PointType = np.dtype([
 	('color', float, 3), 
 	('alpha', float), 
 	('fixed', bool)
-]
+])
 
 #SoA point cloud to replace pointGrid+KaelColor
 @dataclass

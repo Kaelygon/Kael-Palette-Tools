@@ -33,8 +33,10 @@ class PalettePreset:
 	min_lum: float = 0.0
 	max_lum: float = 1.0
 
-	packing_fac: float = 1.0 #Packing efficiency
-	max_attempts: int = 1024 #After this many max_attempts per point, point Sampler will give up
+	sample_radius: float = 0.9 # radius used in PointSampler 
+	relax_radius: float = 1.2, # radius used in ParticleSim
+
+	sample_attempts: int = 1024 #After this many sample_attempts per point, point Sampler will give up
 	relax_count: int = 64 #number of relax iteration after point sampling
 	
 	seed: int = None
@@ -42,8 +44,8 @@ class PalettePreset:
 	def __post_init__(self):
 		self.reserve_transparent = max(0, min(1, self.reserve_transparent) )
 
-		if self.packing_fac <= 0:
-			self.packing_fac = 1e-12
+		if self.sample_radius <= 0:
+			self.sample_radius = 1e-12
 
 		if self.max_colors:
 			self.max_colors -= self.reserve_transparent #max_count includes transparency
@@ -53,27 +55,138 @@ class PalettePreset:
 
 
 class PointSampler:
+	#query np_points vs other_points, remove points np_points that are closer than min_dist to other_points
+	@staticmethod
+	def _removeNearbyPoints(np_points, other_points, min_dist):
+		if len(np_points) == 0 or len(other_points) == 0:
+			return np_points
+		point_tree = cKDTree(other_points)
+		dists, _ = point_tree.query(np_points, k=1) 
+		not_near = dists >= min_dist
+		np_points = np_points[not_near]
+		return np_points
+
+	#query np_points vs np_points, remove other point that's closer than min_dist
+	@staticmethod
+	def _removeNearbySelf(np_points, min_dist):
+		if len(np_points) < 2:
+			return np_points
+		point_tree = cKDTree(np_points)
+		pairs = point_tree.query_pairs(min_dist)
+		#remove only one of the pair points that is too close
+		if pairs:
+			pairs = np.array(list(pairs))
+			too_close = pairs[:,0]
+			np_points = np.delete(np_points, too_close, axis=0)
+		return np_points
+
+	#Generate surface normals of n points evenly distributed on a sphere 
+	@staticmethod
+	def _sphere_normals(normals_count):
+		indices = np.arange(0, normals_count, dtype=float) + 0.5
+		phi = np.arccos(1 - 2*indices/normals_count)
+		theta = np.pi * (1 + 5**0.5) * indices
+
+		x = np.sin(phi) * np.cos(theta)
+		y = np.sin(phi) * np.sin(theta)
+		z = np.cos(phi)
+
+		return np.stack((x, y, z), axis=1)
+
+
+	@staticmethod
+	def poissonDisk(
+		rand: np.random.Generator,
+		point_list: PointList,
+		point_count: int,
+		radius: float,
+		overlap: float = 0.0,
+		kissing_number = 48
+	):
+		initial_points = point_list.points["color"]
+		min_dist = radius - radius * overlap
+
+		offset_list = PointSampler._sphere_normals(kissing_number) * radius
+
+		#Generate corners as starting seed
+		xx,yy,zz = np.meshgrid([0,1], [0,1], [0,1], indexing='ij')
+		linear_corners = np.vstack([xx.ravel(), yy.ravel(), zz.ravel()]).T
+		ok_corners = linearToOklab(linear_corners)
+
+		#remove corners close to initial_points
+		ok_corners = PointSampler._removeNearbyPoints(ok_corners, initial_points, min_dist)
+
+		accepted_points = np.empty((0,3))
+		accepted_points = np.vstack((accepted_points, ok_corners))
+		active_points = np.vstack((accepted_points, initial_points))
+
+
+		iterations = 0
+		while accepted_points.shape[0] < point_count and active_points.shape[0]:
+			iterations+=1
+			#Generate sphere of points around each point
+			np_points = active_points[:, None, :] + offset_list[None, :, :]
+			np_points = np_points.reshape(-1, 3)
+
+			#remvoe outside gamut
+			in_gamut = OkTools.inOklabGamut(np_points)
+			np_points = np_points[in_gamut]
+
+			#remove nearby points
+			all_points = np.vstack((accepted_points, initial_points))
+			np_points = PointSampler._removeNearbyPoints(np_points, all_points, min_dist)
+			np_points = PointSampler._removeNearbySelf(np_points, min_dist)
+
+			#new points become new seeds
+			accepted_points = np.vstack((accepted_points, np_points))
+			active_points = np_points
+
+		#to PointList
+		accepted_points = accepted_points[:point_count]
+		if len(accepted_points):
+			output_list = PointList("oklab", len(accepted_points))
+			output_list.points['color'] = accepted_points
+			output_list.points['alpha'] = 1.0
+			output_list.points['fixed'] = False
+		else:
+			return PointList("oklab", 0)
+
+		print("PointSampler poissonDisk() finished after " + str(iterations) + " iterations.")
+		return output_list
+
 
 	#Simple rejection sampling
 	@staticmethod
-	def poissonReject(
+	def randomReject(
 		rand: np.random.Generator,
 		point_list: PointList, 
-		min_dist: float, 
 		point_count: int, 
-		max_attempts: int = 1000
+		radius: float = None, 
+		overlap: float = None, #None skips distance check
+		sample_attempts: int = 1000
 	):
-		batch_size = 4 * point_count
+		box_volume = np.prod(OkTools.OKLAB_BOX_SIZE)
+		in_gamut_prob = OkTools.OKLAB_GAMUT_VOLUME / box_volume #probability being in gamut
 
-		output_list = PointList("oklab") 
+		min_dist = None
+		batch_mul = 1.0 
+		if overlap!=None and radius != None: 
+			batch_mul = 1.0 / overlap #guesstimate point_count + reject_count of random point_cloud
+			overlap = min(max(overlap, 0.05), 0.95)
+			min_dist = radius - radius * overlap
+
+		batch_size = int(batch_mul * point_count / in_gamut_prob) +1
+
+		initial_points = point_list.points["color"]
+		accepted_points = np.empty((0,3)) 
 
 		attempts=0
-		while len(output_list) < point_count:
+		while len(accepted_points) < point_count:
 			attempts+=1
-			if attempts > max_attempts:
+			if attempts > sample_attempts:
 				break
 
-			np_points = rand.random((batch_size, 3))*OkTools.OKLAB_RANGE[:None] + OkTools.OKLAB_MIN
+			np_points = rand.random((batch_size, 3))*OkTools.OKLAB_BOX_SIZE + OkTools.OKLAB_BOX_MIN
 
 			#discard outside gamut
 			in_gamut = OkTools.inOklabGamut(np_points)
@@ -83,33 +196,24 @@ class PointSampler:
 				continue
 
 			#discard if too close
-			#query np_points vs (original + previous)
-			accepted_points = np.concatenate( [point_list.points["color"], output_list.points["color"]] ) #original points + previous iter
-			if accepted_points.size and min_dist != None:
-				point_tree = cKDTree(accepted_points)
-				dists, _ = point_tree.query(np_points, k=1) 
-				not_near = dists >= min_dist
-				np_points = np_points[not_near]
+			if min_dist != None:
+				all_points = np.vstack((accepted_points, initial_points))
+				np_points = PointSampler._removeNearbyPoints(np_points, accepted_points, min_dist)
+				np_points = PointSampler._removeNearbySelf(np_points, min_dist)
 
-				if len(np_points) == 0:
-					continue
+			accepted_points = np.vstack((accepted_points, np_points))
 
-				#query np_points vs np_points
-				point_tree = cKDTree(np_points)
-				dists, _ = point_tree.query(np_points, k=2) 
-				not_near = dists[:,1] >= min_dist #[:,0] is itself
-				np_points = np_points[not_near]
-
-			#concat
-			accepted_list = PointList("oklab", len(np_points)) 
-			accepted_list.points['color'] = np_points
-			accepted_list.points['alpha'] = 1.0
-			accepted_list.points['fixed'] = False
-
-			output_list.concat(accepted_list)
+		#to PointList
+		accepted_points = accepted_points[:point_count]
+		if len(accepted_points):
+			output_list = PointList("oklab", len(accepted_points))
+			output_list.points['color'] = accepted_points
+			output_list.points['alpha'] = 1.0
+			output_list.points['fixed'] = False
+		else:
+			return PointList("oklab", 0)
 
 		print("PointSampler random() finished after " + str(attempts) + " attempts.")
-		output_list.points = output_list.points[:point_count]
 		return output_list
 		
 
@@ -118,12 +222,12 @@ class PointSampler:
 	def zero(preset: PalettePreset, point_count: int):
 		oklab_origin = [0.5, 0.0, 0.0]
 
-		accepted_list = PointList("oklab", point_count) 
-		accepted_list.points['color'] = oklab_origin
-		accepted_list.points['alpha'] = 1.0
-		accepted_list.points['fixed'] = False
+		accepted_points = PointList("oklab", point_count) 
+		accepted_points.points['color'] = oklab_origin
+		accepted_points.points['alpha'] = 1.0
+		accepted_points.points['fixed'] = False
 
-		return accepted_list
+		return accepted_points
 
 
 	#Generate grayscale gradient between black and white
@@ -234,8 +338,10 @@ class PaletteGenerator:
 		print("Using seed: " + str(preset.seed))
 
 		cell_size = approxOkGap(preset.max_colors)
-		point_radius = cell_size * preset.packing_fac
-		print("Using point_radius "+str(round(point_radius,4)))
+		sample_point_radius = cell_size * preset.sample_radius
+		relax_point_radius = cell_size * preset.relax_radius
+		print("Using sample_point_radius "+str(round(sample_point_radius,4)))
+		print("Using relax_point_radius "+str(round(relax_point_radius,4)))
 
 		#preset points
 		if preset.img_pre_colors != None:
@@ -243,22 +349,35 @@ class PaletteGenerator:
 			palette_list.concat(pre_points)
 
 		#grayscale points
-		gray_points = PointSampler.grayscale(preset.gray_count, point_radius)
+		gray_points = PointSampler.grayscale(preset.gray_count, sample_point_radius)
 		palette_list.concat(gray_points)
 
 		#poisson points
 		empty_point_count = preset.max_colors - len(palette_list)
 		empty_point_count = max(0,empty_point_count)
 		if preset.sample_method in [0,2] and empty_point_count>0:
-			poisson_points = PointSampler.poissonReject( rand, palette_list, point_radius*0.51, empty_point_count, preset.max_attempts )
+			poisson_points = PointSampler.poissonDisk(
+				rand = rand,
+				point_list=palette_list, 
+				point_count=empty_point_count, 
+				radius=sample_point_radius, 
+				overlap = 0.0
+			)
 			palette_list.concat(poisson_points)
 
-		#fallback with no radius check
+		#fallback random
 		empty_point_count = preset.max_colors - len(palette_list)
 		empty_point_count = max(0,empty_point_count)
 		if preset.sample_method in [1,2] and empty_point_count>0:
-			poisson_points = PointSampler.poissonReject( rand, palette_list, None, empty_point_count, 1000 )
-			palette_list.concat(poisson_points)
+			random_points = PointSampler.randomReject( 
+				rand=rand, 
+				point_list = palette_list, 
+				point_count = empty_point_count, 
+				radius=sample_point_radius, 
+				overlap = 0.49,
+				sample_attempts = preset.sample_attempts
+			)
+			palette_list.concat(random_points)
 
 		#truncate palette
 		palette_list.points = palette_list.points[:preset.max_colors]
@@ -267,7 +386,7 @@ class PaletteGenerator:
 		palette_list = simulator.relaxCloud(
 			point_list = palette_list,
 			iterations=preset.relax_count,
-			approx_radius = point_radius,
+			approx_radius = relax_point_radius,
 			record_frame_path = histogram_path,
 			rand = rand
    	)

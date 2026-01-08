@@ -1,5 +1,4 @@
 #ParticleSim.py
-import math
 from dataclasses import dataclass, fields
 import numpy as np
 from scipy.spatial import cKDTree
@@ -10,9 +9,10 @@ from PointList import *
 
 class ParticleType:
 	"""ParticleType ParticleType(PointList point_list, float start_radius)"""
+	@dataclass(frozen=True)
 	class DEF: #default values
 		v			= [0.0,0,0]
-		A			= math.pi * (0.1)**2
+		A			= np.pi * (0.1)**2
 		Cd			= 0.47
 		rho		= 3.0
 		m			= 0.4
@@ -22,6 +22,7 @@ class ParticleType:
 		clipped	= False 
 		stress	= 0.0 
 
+	pid:		"int pid"				#identifier
 	pos:		"float[][3]	pos"		#position
 	fixed:	"bool[]		fixed"	#is immovable?
 	v:			"float[][3]	v"			#velocity
@@ -40,6 +41,7 @@ class ParticleType:
 	def __init__(self, point_list, start_radius):
 		D = self.DEF
 		p_count = len(point_list)
+		self.pid 		= np.arange(p_count)
 		self.pos			= point_list.points["color"].copy()
 		self.fixed		= point_list.points["fixed"].copy()
 		self.v			= np.zeros((p_count, 3)) + D.v
@@ -57,6 +59,30 @@ class ParticleType:
 
 	def __len__(self):
 		return len(self.pos)
+
+	def shuffle(self, order):
+		"""void forceToAcceleration(int[] order)"""
+		for name, val in vars(self).items():
+			val[:] = val[order]
+
+	def createVariance(self, rand, scale):
+		"""void forceToAcceleration(np.random.Generator rand, float scale)"""
+		def scale_noise(shape, scale, dims=1):
+			return 1.0 - (rand.random(shape) - 0.5) * scale
+
+		count = len(self)
+		noise_v = (rand.random((count,3)) - 0.5) * scale
+		noise_m = scale_noise(count, scale)
+		noise_k = scale_noise(count, scale)
+		noise_radius = scale_noise(count, scale)
+		noise_mu = scale_noise(count, scale)
+
+		self.v = noise_v * self.radius[:,None]
+		self.m*=noise_m
+		self.k*=noise_k
+		self.radius*=noise_radius
+		self.mu*=noise_mu
+		return
 
 class ParticleSim:
 	"""Physics based spring/collision simulator to distribute points."""
@@ -235,10 +261,7 @@ class ParticleSim:
 			np.random.Generator rand
 		)
 		"""
-		if rand == None:
-			rand = np.random.Generator()
-
-		if iterations == 0 or len(point_list.points) < 2:
+		if len(point_list.points) < 2:
 			return point_list #Can't do anything with 0 or 1 points
 
 		if anneal_steps == None:
@@ -246,6 +269,9 @@ class ParticleSim:
 		relax_end_steps = 4*anneal_steps #Allow start and end relax longer 
 
 		particles = ParticleType(point_list, approx_radius)
+		if rand != None:
+			#Add run to run variation
+			particles.createVariance(rand, 0.01)
 
 		if record_frame_path:
 			record_frequency_dt = 1.0 #save frame every N sim_dt
@@ -285,6 +311,11 @@ class ParticleSim:
 			#Only update particle neighbors when any particle has moved <tree_update_threshold> of its radius
 			move_in_radius = OkTools.vec3Length(particles.pos - last_tree_pos, axis=1) / (particles.radius + 1e-12)
 			if np.max(move_in_radius) > tree_update_threshold:
+				#Shuffle has very little effect as everything except overlapping points don't care about order
+				#if rand != None:
+				#	order = rand.permutation(len(particles))
+				#	particles.shuffle(order)
+
 				last_tree_pos = particles.pos.copy()
 
 				n_pad_idxs, n_valid_idxs, neighbors_count = self.updateParticleNeighbors(particles, search_radius)
@@ -303,14 +334,15 @@ class ParticleSim:
 				valid_n_dist_vec = neighbors_dist_vec[n_valid_idxs]
 				neighbors_norm[n_valid_idxs], neighbors_dist[n_valid_idxs] = OkTools.vec3ArrayNorm( valid_n_dist_vec )
 
-				#random normal if exactly on top of neighbor
+				#opposing norm if exactly on top of neighbor, order dependant
 				zero_neighbor_dist = neighbors_dist==0 #if particle neighbor dists is 0
 				zero_neighbor_dist[~n_valid_idxs] = False #prune padding
 				inside_neighbor = np.any( zero_neighbor_dist, axis=1)
 				if np.any( inside_neighbor ):
 					inside_count = np.sum(zero_neighbor_dist)
-					rand_dir = rand.random((inside_count, 3)) - 0.5 #not normalized
-					neighbors_norm[zero_neighbor_dist] = rand_dir
+					norm_offset = particles.pos[inside_neighbor][0]
+					rand_norm = OkTools.sphereNormals(inside_count, norm_offset) #deterministic way deciding
+					neighbors_norm[zero_neighbor_dist] = rand_norm
 
 				#spring forces
 				neighbor_force, neighbor_force_mag = self.calcSpringForce(particles.radius, particles.k, n_valid_idxs, neighbors_dist, neighbors_norm)
@@ -398,7 +430,7 @@ class ParticleSim:
 				frame = particles.pos.astype(np.float32)
 				particle_frames.append(frame)
 
-			if tick%log_frequency==0 or tick==iterations-1:
+			if log_frequency and (tick%log_frequency==0 or tick==iterations-1):
 				total_energy=self.calcTotalEnergy(particles.m, particles.v_mag)
 				out_str = "DT: " + str(round(sim_dt,print_precision)) + " Total energy["+str(round(sim_time_elapsed,print_precision))+"]:"
 				out_str+= " "+str(total_energy)
@@ -409,10 +441,16 @@ class ParticleSim:
 				print("P: minr " + str(min_r) + " medr" + str(med_r) + " maxr" + str(max_r))
 		
 		if record_frame_path:
-			print("Writing particle_frames... ")
+			if log_frequency:
+				print("Writing particle_frames... ")
 			npy_frames = np.array(particle_frames, dtype=np.float32)
 			np.save(record_frame_path, npy_frames)
 
-		print("relaxCloud Done\n")
+		#ensure order to match original point_list
+		order = np.argsort(particles.pid)
+		particles.shuffle(order)
 		point_list.points["color"] = particles.pos
+
+		if log_frequency:
+			print("relaxCloud Done\n")
 		return point_list

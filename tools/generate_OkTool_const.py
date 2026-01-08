@@ -1,4 +1,3 @@
-import math
 import numpy as np
 from scipy.spatial import cKDTree
 from PIL import Image
@@ -43,7 +42,7 @@ def calc_OkLabVolume(point_cloud, precision):
 	OKLAB_GAMUT_VOLUME = np.sum(in_gamut) / point_cloud.shape[0]
 	exp = 10**precision
 	OKLAB_GAMUT_VOLUME = np.ceil(OKLAB_GAMUT_VOLUME * exp) / exp
-	print("OKLAB_GAMUT_VOLUME = ", OKLAB_GAMUT_VOLUME, " # (oklab gamut) / (srgb gamut)" )
+	print("OKLAB_GAMUT_VOLUME = ", "%0.20f" % OKLAB_GAMUT_VOLUME, " # (oklab gamut) / (srgb gamut)" )
 
 
 def calc_OkLabRange(precision):
@@ -65,26 +64,28 @@ def calc_OkLabRange(precision):
 	np.save(record_frame_path, npy_frames)
 
 	exp = 10**precision
-	OKLAB_MIN = np.floor(oklab_corners.min(axis=0) * exp) / exp 
-	OKLAB_MAX = np.ceil (oklab_corners.max(axis=0) * exp) / exp
-	OKLAB_RANGE = np.ceil((OKLAB_MAX - OKLAB_MIN) * exp) / exp
+	OKLAB_MIN = np.ceil(oklab_corners.min(axis=0) * exp) / exp 
+	OKLAB_MAX = np.floor(oklab_corners.max(axis=0) * exp) / exp
+	OKLAB_SIZE = OKLAB_MAX - OKLAB_MIN
 
 	oklab_min_str = np.array2string(OKLAB_MIN, separator=', ')
 	oklab_max_str = np.array2string(OKLAB_MAX, separator=', ')
-	oklab_range_str = np.array2string(OKLAB_RANGE, separator=', ')
+	oklab_size_str = np.array2string(OKLAB_SIZE, separator=', ')
 
-	print("OKLAB_MIN =   np.array(", oklab_min_str, ") # OkLab bounding box")
-	print("OKLAB_MAX =   np.array(", oklab_max_str, ")")
-	print("OKLAB_RANGE = np.array(", oklab_range_str, ")")
+	print("OKLAB_BOX_MIN =   np.array(", oklab_min_str, ") # OkLab bounding box")
+	print("OKLAB_BOX_MAX =   np.array(", oklab_max_str, ")")
+	print("OKLAB_BOX_SIZE= np.array(", oklab_size_str, ")")
 
 
 if __name__ == '__main__':
+	np.set_printoptions(precision=8)
 	color_depth = 256
 	point_cloud = createMeshGrid(color_depth)
 
-	calc_fallbackNorm(precision = 8)
+	precision=18
+	calc_fallbackNorm(precision = precision)
 	print("")
-	calc_closestPoints(point_cloud, precision = 8)
-	calc_OkLabVolume(point_cloud, precision = 8)
+	calc_closestPoints(point_cloud, precision = precision)
+	calc_OkLabVolume(point_cloud, precision = precision)
 	print("")
-	calc_OkLabRange(precision = 8)
+	calc_OkLabRange(precision = precision)

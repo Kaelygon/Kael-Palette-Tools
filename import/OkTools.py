@@ -71,9 +71,9 @@ class OkTools:
 	OKLAB_8BIT_MARGIN =  7.011e-05  # minimum SRGB distance in oklab space
 	OKLAB_GAMUT_VOLUME =  0.05356533  # (oklab gamut) / (srgb gamut)
 
-	OKLAB_BOX_MIN =   np.array( [ 0.        , -0.23388758, -0.31152815] ) # OkLab bounding box
-	OKLAB_BOX_MAX =   np.array( [1.        , 0.2745663 , 0.19856976] )
-	OKLAB_BOX_SIZE = np.array( [1.        , 0.50845388, 0.51009792] )
+	OKLAB_BOX_MIN =   np.array( [ 0.        , -0.23388757, -0.31152815] ) # OkLab bounding box
+	OKLAB_BOX_MAX =   np.array( [0.99999999, 0.27456629, 0.19856975] )
+	OKLAB_BOX_SIZE = np.array( [0.99999999, 0.50845387, 0.5100979 ] )
 
 	DARKEST_BLACK_LAB = srgbToOklab(np.array([[0.499/255,0.499/255,0.499/255]]))[0] #brighest 8-bit SRGB rounded to pure black 
 
@@ -148,3 +148,22 @@ class OkTools:
 		rgb = np.round(rgb * 255.0)	
 		rgb = rgb.astype(np.uint8)
 		return "#{:02x}{:02x}{:02x}".format(rgb[0],rgb[1],rgb[2])
+
+	#Generate surface normals of n points evenly distributed on a sphere
+	#offset (n,m) shifts the points on surface
+	@staticmethod
+	def sphereNormals(point_count: int, offset: np.ndarray = 0.0):
+		offset = np.atleast_1d(offset).astype(float)
+		golden_ratio = (1 + 5**0.5) / 2.0
+		powers = golden_ratio ** np.arange(offset.shape[-1]) #irrational base polynomial
+		angle_offset = np.dot(offset, powers) #x * b**2 + y * b**1 + z * b**2
+
+		indices = np.arange(0, point_count, dtype=float) + 0.5
+		alpha = np.arccos(1 - 2*indices/point_count)
+		theta = 2 * np.pi * golden_ratio * (indices + angle_offset)
+		
+		x = np.sin(alpha) * np.cos(theta)
+		y = np.sin(alpha) * np.sin(theta)
+		z = np.cos(alpha)
+
+		return np.stack((x, y, z), axis=1)

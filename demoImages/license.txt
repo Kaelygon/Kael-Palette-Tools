@@ -9,6 +9,6 @@ Image                               :  Source
 
 Readme Images
 
-/demoImages/LPlumocrista_bayer_example.png   : Kaelygon CC BY-NC 4.0
+demoImages/LPlumocrista_dither_variants.png : Kaelygon CC BY-NC 4.0
 /demoImages/Michelangelo_David_steinberg.png  : Public domain, derivation by Kaelygon
 /demoImages/KaelygonLogo25_palettize16_example.png: Kaelygon CC BY-NC 4.0

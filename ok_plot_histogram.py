@@ -1,12 +1,11 @@
+#!/usr/bin/env python
+
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button
 import numpy as np
 import matplotlib.animation as animation
 
-import sys
-sys.path.insert(1, './import/')
-
-from OkTools import *
+from palette.OkTools import *
 
 """
 thanks for chat gee pee tee for this absolute mess of a script

@@ -1,11 +1,11 @@
+#!/usr/bin/env python
 #CC0 Kaelygon 2025
 """
 Palettize and dither using arbitrary palette
 """
 
 import sys
-sys.path.insert(1, './import/')
-from PalettizeImage import *
+from palette.PalettizeImage import *
 
 
 if __name__ == '__main__':

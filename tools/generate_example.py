@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 #CC0 Kaelygon 2025
 """
 Generate all dither variants
@@ -5,8 +6,11 @@ Some examples of good values
 """
 
 import sys
-sys.path.insert(1, './import/')
-from PalettizeImage import *
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from palette.PalettizeImage import *
 
 from PIL import ImageDraw, ImageFont
 

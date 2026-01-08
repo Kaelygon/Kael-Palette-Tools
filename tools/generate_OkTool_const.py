@@ -1,12 +1,16 @@
+#!/usr/bin/env python
+
 import numpy as np
 from scipy.spatial import cKDTree
 from PIL import Image
 from dataclasses import dataclass, field
 
 import sys
-sys.path.insert(1, './import/')
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
-from OkTools import *
+from palette.OkTools import *
 
 def createMeshGrid(size):
 	x = np.arange(size)

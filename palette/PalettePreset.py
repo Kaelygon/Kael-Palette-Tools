@@ -55,14 +55,18 @@ class PalettePreset:
 			self.sample_radius = 1e-12
 
 		if self.max_colors < 1:
-			self.max_colors = 64
+			self.max_colors = 63
+
+		if self.seed == None:
+			self.seed = int(np.random.SeedSequence().entropy)
 
 		#Sample method
 		has_valid_method = False
 		for i,method in enumerate(self.sample_method):
-			self.sample_method[i] = method.lower()
-			if method not in self.VALID_METHODS:
-				print("invalid method ", method)
+			method_lower = method.lower()
+			self.sample_method[i] = method_lower
+			if method_lower not in self.VALID_METHODS:
+				print("invalid method ", method_lower)
 			else:
 				has_valid_method = True
 
@@ -91,14 +95,14 @@ class PalettePreset:
 
 			if is_input[i]:
 				#input file checks
-				if not os.path.exists(file) or not os.access(base_dir, os.R_OK):
+				if not os.path.exists(file) or not os.access(file, os.R_OK):
 					print("File doesn't exist "+file)
 					preset_fail = 1
 
 			else:
 				#output file checks
-				if not os.access(base_dir, os.W_OK):
-					print("Can't access directory "+base_dir)
+				if not os.access(file, os.W_OK):
+					print("Can't access file "+file)
 					preset_fail = 1
 
 			if preset_fail:

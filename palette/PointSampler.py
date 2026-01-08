@@ -67,7 +67,8 @@ class PointSampler:
 		l_max, a_max, b_max = OkTools.OKLAB_BOX_MAX -eps
 
 		lab_size = OkTools.OKLAB_BOX_SIZE - 2.0*eps
-		l_steps, a_steps, b_steps, = np.round(lab_size/min_dist).astype(int)
+		step_count = np.clip(lab_size/(min_dist+1e-12),1,255)
+		l_steps, a_steps, b_steps, = np.round(step_count).astype(int)
 
 		#mesh grid
 		l = np.linspace(l_min, l_max, num=l_steps, endpoint=True)
@@ -121,6 +122,7 @@ class PointSampler:
 
 		return pre_list
 
+	@staticmethod
 	def _generateEdges(num):
 		steps = np.arange(num)
 		edges = []
@@ -282,7 +284,8 @@ class PointSampler:
 			rand = np.random.default_rng(0)
 
 		min_dist = radius - radius * overlap
-		grid_points = PointSampler._createMeshGrid(radius/2.0) #twice as dense as search grid
+		grid_density = radius/2.0 #twice as dense as search grid
+		grid_points = PointSampler._createMeshGrid(grid_density)
 
 		initial_points = point_list.points["color"]
 		accepted_points = np.empty((0,3))

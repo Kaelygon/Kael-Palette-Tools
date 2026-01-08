@@ -26,7 +26,7 @@ class PointListStats:
 		pair_idxs = pair_idxs[unique_idxs]
 		pair_dists = pair_dists[unique_idxs]
 
-		# sort by distance
+		#sort by distance
 		sorted_idxs = np.argsort(pair_dists)
 		pair_idxs = pair_idxs[sorted_idxs]
 		pair_dists = pair_dists[sorted_idxs]

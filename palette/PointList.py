@@ -44,8 +44,6 @@ class PointList:
 		#Optional preset
 		if preset != None:
 			self.preset = preset
-			if self.preset.seed == None:
-				self.preset.seed = int(np.random.SeedSequence().entropy)
 			self.rand = np.random.default_rng(self.preset.seed)
 
 
@@ -98,19 +96,26 @@ class PointList:
 		return None
 
 
-	#concatenate, convert if necessary
-	def concat(self, new_list):
-		if self.type == new_list.type:
-			safe_list = new_list
-		else:
-			safe_list = new_list.copy()
-			safe_list.points["color"] = safe_list.getAsColor(self.type)
+	#concatenate one or array of point_list.points to self, convert if necessary
+	def concat(self, new_stack):
+		if isinstance(new_stack, PointList):
+			new_stack = [new_stack]
 
-		if safe_list == None:
-			print("Warning: PointList has no type! No concat is done.")
-			return
+		same_type_list = [self.points]
+		for current_list in new_stack:
+			if self.type == current_list.type:
+				safe_list = current_list
+			else:
+				safe_list = current_list.copy()
+				safe_list.points["color"] = safe_list.getAsColor(self.type)
 
-		self.points = np.concatenate([self.points, safe_list.points])
+			if safe_list.points["color"] is None:
+				print("Warning: PointList has no type! No concat is done.")
+				continue
+
+			same_type_list.append(safe_list.points)
+
+		self.points = np.concatenate(same_type_list)
 
 
 	#apply luminosity and saturation adjustments

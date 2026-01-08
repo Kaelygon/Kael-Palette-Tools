@@ -15,7 +15,7 @@ class PaletteGenerator:
 		Generate palette where the colors are perceptually evenly spaced out in OKLab colorspace
 	"""
 
-	### Concat generated colors to palette_list ###
+	### Concat generated colors to palette_list.points ###
 
 	#public
 	@staticmethod
@@ -33,6 +33,7 @@ class PaletteGenerator:
 			print("Using relax_point_radius "+str(round(relax_point_radius,4)))
 
 
+		new_point_stack = []
 		for method in preset.sample_method:
 			empty_point_count = preset.max_colors - len(palette_list)
 			empty_point_count = max(0,empty_point_count)
@@ -86,8 +87,9 @@ class PaletteGenerator:
 				)
 
 			if len(new_points):
-				palette_list.concat(new_points)
+				new_point_stack.append(new_points)
 
+		palette_list.concat(new_point_stack)
 
 		#truncate palette
 		palette_list.points = palette_list.points[:preset.max_colors]

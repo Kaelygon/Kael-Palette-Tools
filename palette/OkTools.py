@@ -73,7 +73,7 @@ class OkTools:
 	OKLAB_BOX_MAX =   np.array( [0.99999999, 0.27456629, 0.19856975] )
 	OKLAB_BOX_SIZE = np.array( [0.99999999, 0.50845387, 0.5100979 ] )
 
-	DARKEST_BLACK_LAB = srgbToOklab(np.array([[0.499/255,0.499/255,0.499/255]]))[0] #brighest 8-bit SRGB rounded to pure black 
+	DARKEST_BLACK_LAB = srgbToOklab(np.array([[0.499/255,0.499/255,0.499/255]]))[0] #brighest 8-bit SRGB that rounds to pure black 
 
 
 
@@ -122,7 +122,7 @@ class OkTools:
 	def inOklabGamut(lab_list, eps = 1e-12, lower_bound = 0.0, upper_bound = 1.0, axis=-1):
 		"""bool[] inOklabGamut(float[][3] lab_list, float eps = 1e-12, float lower_bound = 0.0, float upper_bound = 1.0 ))"""
 		lin_list = oklabToLinear(lab_list)
-		in_gamut = (lin_list > lower_bound-eps) & (lin_list < upper_bound+eps)
+		in_gamut = (lin_list >= lower_bound-eps) & (lin_list <= upper_bound+eps)
 		in_gamut = in_gamut.all(axis=axis)
 		return in_gamut
 
@@ -130,7 +130,7 @@ class OkTools:
 	def clipToOklabGamut(lab_list, eps = 1e-12, lower_bound = 0.0, upper_bound = 1.0, axis=-1):
 		"""(float[][3] float[][3]) clipToOklabGamut(float[][3] lab_list, float eps = 1e-12, float lower_bound = 0.0, float upper_bound))"""
 		lin_list = oklabToLinear(lab_list)
-		out_gamut = (lin_list < lower_bound-eps) | (lin_list > upper_bound+eps)
+		out_gamut = (lin_list <= lower_bound-eps) | (lin_list >= upper_bound+eps)
 		out_gamut = out_gamut.any(axis=axis)
 
 		if not np.any(out_gamut):

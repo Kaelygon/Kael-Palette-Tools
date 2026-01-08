@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
 			relax_radius = 1.3,
 			relax_count = 1024,
-			seed=0,
+			seed=None,
 
 			logging=True
 		)

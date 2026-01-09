@@ -175,3 +175,28 @@ class OkTools:
 	@staticmethod
 	def approxOkGap(point_count: int):
 		return (OkTools.OKLAB_GAMUT_VOLUME/max(1,point_count))**(1.0/3.0)
+
+	@staticmethod
+	def xorshift64star(shape, state):
+		rand_arr = (np.arange(0, np.prod(shape), dtype=np.uint64)) + 1 + state
+
+		for _ in range(2):
+			rand_arr ^= rand_arr >> 12
+			rand_arr ^= rand_arr << 25
+			rand_arr ^= rand_arr >> 27
+			rand_arr = rand_arr * 0x2545F4914F6CDD1D
+		
+		state = rand_arr[0]
+		rand_arr = rand_arr.reshape(shape)
+		rand_arr = rand_arr / 2**64
+		return rand_arr, state
+
+	@staticmethod
+	def shuffle(arr, state):
+		if len(arr) == 0:
+			return arr, state
+		order, state = OkTools.xorshift64star(arr.shape[0],state)
+		order = np.argsort(order)
+		order = np.astype(order,np.uint64)
+		arr = arr[order]
+		return arr, state

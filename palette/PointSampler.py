@@ -29,9 +29,9 @@ class PointSampler:
 			return np_points
 
 		tree = cKDTree(np_points)
-		not_near = np.zeros(n, dtype=bool) + True
 		idxs = tree.query_ball_point(np_points, min_dist)
 
+		not_near = np.zeros(n, dtype=bool) + True
 		for i in range(n):
 			if not not_near[i]:
 					continue
@@ -51,7 +51,7 @@ class PointSampler:
 		min_dist = None
 		batch_mul = 1.0
 		if overlap!=None and radius != None:
-			overlap = min(max(overlap, 0.05), 0.95)
+			overlap = min(max(overlap, 0.2), 0.95)
 			batch_mul = 1.0 / overlap #guesstimate point_count + reject_count of random point_cloud
 			min_dist = radius - radius * overlap
 
@@ -83,7 +83,6 @@ class PointSampler:
 		grid_points, _ = OkTools.clipToOklabGamut(grid_points)
 
 		return grid_points
-
 
 
 	#convert preset.img_pre_colors to PointList. Luminance in preset.img_fixed_mask makes the point immovable
@@ -136,6 +135,7 @@ class PointSampler:
 		edges = np.vstack(edges)
 		edges = edges / max(1,np.max(edges))
 		ok_corners = linearToOklab(edges)
+		ok_corners, _ = OkTools.clipToOklabGamut(ok_corners)
 		return ok_corners
 
 
@@ -157,7 +157,7 @@ class PointSampler:
 
 		offset = np.zeros((1,3))
 		rand = point_list.rand
-		if rand != None:
+		if rand:
 			offset = rand.random((1,3))
 		neighbor_offsets = OkTools.sphereNormals(kissing_number, offset) * radius
 
@@ -222,21 +222,25 @@ class PointSampler:
 		logging = False
 	):
 		rand = point_list.rand
-		if rand == None:
-			rand = np.random.default_rng(0)
 
 		batch_size, min_dist = PointSampler._calcBatchSize(point_count, radius, overlap)
+		batch_size = min(100000, batch_size)
 
 		initial_points = point_list.points["color"]
 		accepted_points = np.empty((0,3))
 
+		rand_state=0
 		attempts=0
 		while len(accepted_points) < point_count:
 			if attempts >= sample_attempts:
 				break
 			attempts+=1
 
-			np_points = rand.random((batch_size, 3))*OkTools.OKLAB_BOX_SIZE + OkTools.OKLAB_BOX_MIN
+			if rand:
+				np_points = rand.random((batch_size, 3))
+			else:
+				np_points, rand_state = OkTools.xorshift64star((batch_size, 3), rand_state)
+			np_points = np_points * OkTools.OKLAB_BOX_SIZE + OkTools.OKLAB_BOX_MIN
 
 			#discard outside gamut
 			in_gamut = OkTools.inOklabGamut(np_points)
@@ -280,11 +284,9 @@ class PointSampler:
 		logging = False
 	):
 		rand = point_list.rand
-		if rand == None:
-			rand = np.random.default_rng(0)
 
 		min_dist = radius - radius * overlap
-		grid_density = radius/2.0 #twice as dense as search grid
+		grid_density = radius
 		grid_points = PointSampler._createMeshGrid(grid_density)
 
 		initial_points = point_list.points["color"]
@@ -298,10 +300,11 @@ class PointSampler:
 			offset_list.append(neighbor_offsets)
 		neighbor_offsets = np.vstack(offset_list)
 
-		#Accept order matters so this acts as jitter
-		order = np.arange(neighbor_offsets.shape[0])
-		rand.shuffle(order)
-		neighbor_offsets = neighbor_offsets[order]
+		#Random order for the regular offsets
+		if rand:
+			rand.shuffle(neighbor_offsets)
+		else:
+			neighbor_offsets, rand_state = OkTools.shuffle(neighbor_offsets,0)
 
 		attempts=0
 		for offset in neighbor_offsets:
@@ -329,6 +332,10 @@ class PointSampler:
 
 
 		#to PointList
+		if rand:
+			rand.shuffle(accepted_points) #randomize which points are kept
+		else:
+			accepted_points, rand_state = OkTools.shuffle(accepted_points,0)
 		accepted_points = accepted_points[:point_count]
 		if len(accepted_points):
 			output_list = PointList("oklab", len(accepted_points), 1.0, False)

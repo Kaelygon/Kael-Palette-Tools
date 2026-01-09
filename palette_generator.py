@@ -28,29 +28,30 @@ def run_PaletteGenerator(preset):
 if __name__ == '__main__':
 	output_path = "./output/"
 	preset_pal64 = PalettePreset(
-			sample_method = ["gray", "poisson", "grid"],
+			sample_method = ["gray", "poisson", "grid", "random"],
 			reserve_transparent=1,
 			img_pre_colors = "palettes/pal64.png",
 			img_fixed_mask = "palettes/pal64-fixed.png",
 			histogram_file = output_path + "cloudHistogram.npy",
 			palette_output = output_path + "testPalette.png",
 
-			gray_count	=6,
-			max_colors	=255,
-			hue_count	=12,
-			min_sat		=0.0,
-			max_sat		=1.0,
-			min_lum		=0.0,
-			max_lum		=1.0,
+			gray_count	= 15,
+			max_colors	= 255,
+			hue_count	= 12,
+			min_sat		= 0.0,
+			max_sat		= 1.0,
+			min_lum		= 0.0,
+			max_lum		= 1.0,
 		
 			sample_radius = 1.1,
 			sample_attempts = 1024,
 
 			relax_radius = 1.3,
 			relax_count = 1024,
-			seed=None,
+			use_rand = True,
+			seed = None,
 
-			logging=True
+			logging = True
 		)
 
 	if not os.path.exists(output_path):

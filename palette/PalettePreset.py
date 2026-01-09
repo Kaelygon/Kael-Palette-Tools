@@ -19,7 +19,7 @@ class PalettePreset:
 	#"gray" generate gray_count grayscale colors
 	#"poisson" poisson disk sample
 	#"voids" find and fill voids
-	#"random" random reject, allows 51% sample_radius overlap, requires seed>0
+	#"random" random reject, allows 51% sample_radius overlap
 	#"zero" generate points at [0.5,0.0,0.0]
 	sample_method: list[str] = field(default_factory=lambda: ["gray", "poisson", "grid"])
 
@@ -40,6 +40,7 @@ class PalettePreset:
 	sample_attempts: int = 1024 #After this many sample_attempts per point, sampler method will give up
 	relax_count: int = 1024 #number of relax iteration after point sampling
 	
+	use_rand: bool = True # Use numpy rand otherwise use builtin random
 	seed: int = None #None = random seed, [0,UINT64_MAX] = set seeded
 
 	logging: bool = False #Disables stats and some printing

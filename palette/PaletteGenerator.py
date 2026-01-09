@@ -28,18 +28,21 @@ class PaletteGenerator:
 		relax_point_radius = cell_size * preset.relax_radius
 
 		if preset.logging:
-			print("Using seed: " + str(preset.seed))
+			if preset.use_rand:
+				print("Using seed: " + str(preset.seed))
+			else:
+				print("Using built-in random")
 			print("Using sample_point_radius "+str(round(sample_point_radius,4)))
 			print("Using relax_point_radius "+str(round(relax_point_radius,4)))
 
 
-		new_point_stack = []
 		for method in preset.sample_method:
 			empty_point_count = preset.max_colors - len(palette_list)
 			empty_point_count = max(0,empty_point_count)
 			if  empty_point_count<=0:
 				break
 
+			new_points = []
 			#pre_colors from image
 			if method == "precolor":
 				new_points = PointSampler.precolor(preset)
@@ -87,9 +90,7 @@ class PaletteGenerator:
 				)
 
 			if len(new_points):
-				new_point_stack.append(new_points)
-
-		palette_list.concat(new_point_stack)
+				palette_list.concat(new_points)
 
 		#truncate palette
 		palette_list.points = palette_list.points[:preset.max_colors]

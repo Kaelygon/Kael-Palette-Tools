@@ -172,21 +172,25 @@ class ParticleSim:
 		output_radii = np.clip(output_radii,1e-20,2.0)
 		return output_radii
 
-	def updateParticleNeighbors(self, particles, search_radius):
-		"""int[][] bool[][] int[] updateParticleNeighbors(ParticleType particles, float search_radius)"""
+	def updateParticleNeighbors(self, particles, search_radius, max_neighbors=32):
+		"""int[][] bool[][] int[] updateParticleNeighbors(
+			ParticleType particles, 
+			float search_radius, 
+			int max_neighbors
+		)"""
 		## Get neighbors of each point within its radius
 		point_tree = cKDTree(particles.pos)
 		neighbors_list = point_tree.query_ball_point(particles.pos, r=particles.radius * search_radius)
+
+		#every point has different number of neighbors, vectorize with padding
+		neighbors_count = np.fromiter((len(row) for row in neighbors_list), dtype=np.int64) - 1 # -1 self will be removed
+		n_pad_width = np.max(neighbors_count)
+		n_pad_width = np.clip(n_pad_width,1,max_neighbors)
+		n_pad_idxs = np.full((len(neighbors_list), n_pad_width), -1, dtype=int) #(p_count,n_count) int
 		for i, neighbor_idxs in enumerate(neighbors_list):
 			if i in neighbor_idxs:
 				neighbor_idxs.remove(i) #remove self
-
-		#every point has different number of neighbors, vectorize with padding
-		neighbors_count = np.fromiter((len(row) for row in neighbors_list), dtype=np.int64)
-		n_pad_width = np.max(neighbors_count)
-		n_pad_idxs = np.full((len(neighbors_list), n_pad_width), -1, dtype=int) #(p_count,n_count) int
-		for i, row in enumerate(neighbors_list):
-			n_pad_idxs[i, :neighbors_count[i]] = row
+			n_pad_idxs[i, :neighbors_count[i]] = neighbor_idxs[:n_pad_width]
 
 		#invalid neighbors contain garbage, so make sure to clear invalid idxs
 		n_valid_idxs = n_pad_idxs!=-1 #(p_count,n_count) bool
@@ -218,7 +222,7 @@ class ParticleSim:
 		if max_v != 0.0:
 			new_dt = max_move / max_v #t=d/v #limit movement distance per 1.0 sim_dt
 
-		if new_dt>prev_dt:
+		if new_dt>prev_dt: #only smooth if new_dt increases
 			new_dt = new_dt*(1.0-smoothing) + prev_dt*smoothing
 		new_dt = max(min(new_dt,max_dt), min_dt)
 
@@ -226,7 +230,7 @@ class ParticleSim:
 
 	def calcTotalEnergy(self, mass, velocity_mag):
 		"""float calcTotalEnergy(float[] mass, float[] velocity_mag)"""
-		kE = 0.5 * mass * velocity_mag
+		kE = 0.5 * mass * velocity_mag**2
 		total_energy = np.sum(kE,axis=0)
 		return total_energy
 
@@ -311,13 +315,7 @@ class ParticleSim:
 			#Only update particle neighbors when any particle has moved <tree_update_threshold> of its radius
 			move_in_radius = OkTools.vec3Length(particles.pos - last_tree_pos, axis=1) / (particles.radius + 1e-12)
 			if np.max(move_in_radius) > tree_update_threshold:
-				#Shuffle has very little effect as everything except overlapping points don't care about order
-				#if rand != None:
-				#	order = rand.permutation(len(particles))
-				#	particles.shuffle(order)
-
 				last_tree_pos = particles.pos.copy()
-
 				n_pad_idxs, n_valid_idxs, neighbors_count = self.updateParticleNeighbors(particles, search_radius)
 
 
@@ -436,6 +434,7 @@ class ParticleSim:
 				out_str+= " "+str(total_energy)
 				print(out_str)
 			
+				min_r = round(np.min(particles.radius),print_precision)
 				med_r = round(np.median(particles.radius),print_precision)
 				max_r = round(np.max(particles.radius),print_precision)
 				print("P: minr " + str(min_r) + " medr" + str(med_r) + " maxr" + str(max_r))

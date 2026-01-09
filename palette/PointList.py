@@ -44,7 +44,8 @@ class PointList:
 		#Optional preset
 		if preset != None:
 			self.preset = preset
-			self.rand = np.random.default_rng(self.preset.seed)
+			if preset.use_rand == True:
+				self.rand = np.random.default_rng(self.preset.seed)
 
 
 	def __len__(self):

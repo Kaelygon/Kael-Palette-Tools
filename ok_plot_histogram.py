@@ -16,12 +16,6 @@ watch points wiggle or smth
 
 oklab_frame_list = np.load('output/cloudHistogram.npy', allow_pickle=True)
 
-# Convert all frames to Oklab
-labs_frames = []
-for frame in oklab_frame_list:
-    np_arr = np.array(frame)
-    labs_frames.append(np_arr)
-
 # Convert all frames to sRGB for plotting
 srgb_frames = []
 for frame in oklab_frame_list:
@@ -35,7 +29,7 @@ fig = plt.figure(figsize=(10, 8))
 ax = fig.add_subplot(111, projection='3d')
 
 sc = ax.scatter(
-    labs_frames[0][:, 0], labs_frames[0][:, 1], labs_frames[0][:, 2],
+    oklab_frame_list[0][:, 0], oklab_frame_list[0][:, 1], oklab_frame_list[0][:, 2],
     s=64, depthshade=True, facecolors=srgb_frames[0], edgecolors='k', linewidths=0.3
 )
 
@@ -48,7 +42,7 @@ ax.set_zlabel('b')
 # Slider axis
 ax_slider = plt.axes([0.2, 0.02, 0.4, 0.03], facecolor='lightgoldenrodyellow')
 
-frame_count = len(labs_frames)
+frame_count = len(oklab_frame_list)
 slider = Slider(ax_slider, 'Frame', 0, max(1, frame_count - 1), valinit=0, valstep=1)
 if frame_count <= 1:
     slider = Slider(ax_slider, 'Frame', 0, 1, valinit=0, valstep=1)
@@ -70,7 +64,7 @@ ax.set_zlim(b_min, b_max)
 
 def update(val):
     idx = int(slider.val)
-    sc._offsets3d = (labs_frames[idx][:, 0], labs_frames[idx][:, 1], labs_frames[idx][:, 2])
+    sc._offsets3d = (oklab_frame_list[idx][:, 0], oklab_frame_list[idx][:, 1], oklab_frame_list[idx][:, 2])
     sc.set_facecolors(srgb_frames[idx])
     fig.canvas.draw_idle()
 
@@ -82,13 +76,12 @@ btn_play = Button(ax_play, 'Play')
 
 ani = None  # animation created on first play
 playing = False
-n_frames = len(labs_frames)
-interval_ms = 3000.0 / max(1, n_frames)
+interval_ms = 3000.0 / max(1, frame_count)
 
 def advance_frame(frame_index):
-    sc._offsets3d = (labs_frames[frame_index][:, 0],
-                      labs_frames[frame_index][:, 1],
-                      labs_frames[frame_index][:, 2])
+    sc._offsets3d = (oklab_frame_list[frame_index][:, 0],
+                      oklab_frame_list[frame_index][:, 1],
+                      oklab_frame_list[frame_index][:, 2])
     sc.set_facecolors(srgb_frames[frame_index])
     slider.set_val(frame_index)
 
@@ -99,7 +92,7 @@ def toggle_play(event):
             ani = animation.FuncAnimation(
                 fig,
                 advance_frame,
-                frames=range(n_frames),
+                frames=range(frame_count),
                 interval=interval_ms,
                 blit=False,
                 repeat=True,

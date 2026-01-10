@@ -303,7 +303,7 @@ class PalettizeImage:
 			dither			= None,
 			mask_size		= int(arg_list.mask_size),
 			mask_weight		= float(arg_list.mask_weight),
-			print_stats		= str(arg_list.print_stats),
+			print_stats		= False
 		)
 
 
@@ -341,6 +341,9 @@ class PalettizeImage:
 		else:
 			d_preset.output = arg_list.output
 
+		#assing print_stats
+		if (arg_list.print_stats is not None) and (str(arg_list.print_stats).lower() in ["true", "1"]):
+			d_preset.print_stats = True
 
 		#preset validity check
 		preset_fail = 0

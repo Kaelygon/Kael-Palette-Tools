@@ -24,7 +24,7 @@ if __name__ == '__main__':
 			"--merge-radius", "0.0",	#Quantize before palettizing. 0.05 to 0.2 is good value for high depth images
  			"--mask-size", 	"128", 	#dither matrix size
 			"--mask-weight",	"1.0",	#Dither strength for dither = blue or bayer
-			"--stats",			"False",
+			"--stats",			"False", #Print palettize error
 			"--output",			"./output/lazy_test.png",
 		]
 		for arg in lazy_arguments:

@@ -53,6 +53,7 @@ Options:
 -d, --dither        (str  ) Dither type. Options: none, bayer, steinberg
 -ms, --mask-size    (int  ) Dither mask tile size for dither=(bayer, blue) 
 -dw, --mask-weight  (float) Dither strength for dither=(none, bayer). >1.0 May over-dither but results in smoother gradients and better colors
+-S,  --stats		  (bool ) Print palettization error
 ```
 
 ### palette_generator.py
@@ -77,7 +78,8 @@ Yank but it kinda works for debugging the results
 argparse
 sys
 os
-math 
+math
+time
 numpy 
 dataclasses 
 PIL 

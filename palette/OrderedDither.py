@@ -2,9 +2,9 @@ import numpy as np
 from palette.ArrayRandom import *
 
 """
-ordered. namespace matrix creation tools
+OrderedDither. namespace matrix creation tools
 """
-class ordered:
+class OrderedDither:
 	#Normalize 3D matrix slices to (-0.5,0.5)
 	@staticmethod
 	def _normSlices(matrix):
@@ -32,16 +32,17 @@ class ordered:
 		return arr_ranks
 
 	@staticmethod
-	def _fallbackMatrix(depth):
-		amogus = (343150 >> np.arange(25) & 1).reshape(5,5)
-		return np.stack([amogus]*depth, axis=2)
+	def _fallbackMatrix():
+		amogus = (343150 >> np.arange(25) & 1).reshape(5,5) - 0.5 #343150x10 = 5x5 amogus in binary
+		m = np.stack([amogus]*3, axis=2)
+		return m[:,:,0], m[:,:,1], m[:,:,2]
 
 	#Bayer
 	#Take first 3 slices of 3D bayer matrix with side length of n, normalized to -0.5,0.5
 	@staticmethod
 	def bayerOklab(size, depth=3):
 		if size<1:
-			return ordered._fallbackMatrix(depth)
+			return OrderedDither._fallbackMatrix()
 
 		x, y, z = np.meshgrid(np.arange(size), np.arange(size), np.arange(size), indexing='ij')
 		b_m = np.zeros_like(x)
@@ -57,8 +58,8 @@ class ordered:
 		chosen_slices = np.clip(np.arange(depth), 0, size-1)
 		b_m_slices = b_m[:, :, chosen_slices]
 
-		b_m = ordered._rankMatrix(b_m_slices,size,size,depth)
-		b_m = ordered._normSlices(b_m)
+		b_m = OrderedDither._rankMatrix(b_m_slices,size,size,depth)
+		b_m = OrderedDither._normSlices(b_m)
 	
 		m_l = b_m[:,:,0]
 		m_a = b_m[:,:,1]
@@ -71,7 +72,7 @@ class ordered:
 	#weight=0 is white noise, weight=1 is neighborhood avg
 	def blueNoiseOklab(height, width, weight=0.64, channel_count = 3):
 		if height<1 or width<1:
-			return ordered._fallbackMatrix(channel_count)
+			return OrderedDither._fallbackMatrix()
 
 		rand = ArrayRandom(0)
 		pixels = rand.random((height,width,channel_count))
@@ -89,10 +90,10 @@ class ordered:
 
 		avg_invert = 1.0-neighborhood_avg
 		new_pos = pixels*(1.0-weight) + avg_invert*(weight)
-		pixels = ordered._normSlices(new_pos)
+		pixels = OrderedDither._normSlices(new_pos)
 
-		pixels = ordered._rankMatrix(pixels,height,width,channel_count)
-		pixels = ordered._normSlices(pixels)
+		pixels = OrderedDither._rankMatrix(pixels,height,width,channel_count)
+		pixels = OrderedDither._normSlices(pixels)
 	
 		m_l = pixels[:,:,0]
 		m_a = pixels[:,:,1]

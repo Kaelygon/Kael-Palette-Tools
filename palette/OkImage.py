@@ -210,7 +210,7 @@ class OkImage:
 
 			palette_gaps = np_lerp(palette_gaps, palette_gaps_norm, gater[:,None]*[1,1,1])
 
-		thresholds_lab = ordered.bayerOklab(matrix_size)
+		thresholds_lab = OrderedDither.bayerOklab(matrix_size)
 
 		self.pixels_output[:,:3] = self._applyDitherThresholds(pixels, thresholds_lab, palette_gaps, pal_list)
 
@@ -222,7 +222,7 @@ class OkImage:
 		pal_dists, idxs = pal_tree.query(pixels, k=2)
 		palette_gaps = np.abs(pal_list.color[idxs[:,1]] - pal_list.color[idxs[:,0]])
 
-		blue_thresholds = ordered.blueNoiseOklab(matrix_size,matrix_size)
+		blue_thresholds = OrderedDither.blueNoiseOklab(matrix_size,matrix_size)
 		blue_thresholds = np.array(blue_thresholds) * dither_weight
 
 		self.pixels_output[:,:3] = self._applyDitherThresholds(pixels, blue_thresholds, palette_gaps, pal_list)

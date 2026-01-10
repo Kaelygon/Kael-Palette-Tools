@@ -27,7 +27,7 @@ def calc_fallbackNorm(precision):
 	print("FALLBACK_NORM = np.array([", sqrtThird,"]*3) * [1,-1,1] #sqrt(1/3)" )
 
 def calc_closestPoints(point_cloud, precision):
-	ok_cloud = srgbToOklab(point_cloud)
+	ok_cloud = OkLab.srgbToOklab(point_cloud)
 
 	tree = cKDTree(ok_cloud)
 	dists, _ = tree.query(ok_cloud, k=2)
@@ -60,7 +60,7 @@ def calc_OkLabRange(precision):
 	frame = corners.astype(np.float32)
 	particle_frames.append(frame)
 
-	oklab_corners = srgbToOklab(corners)
+	oklab_corners = OkLab.srgbToOklab(corners)
 	frame = oklab_corners.astype(np.float32)
 	particle_frames.append(frame)
 

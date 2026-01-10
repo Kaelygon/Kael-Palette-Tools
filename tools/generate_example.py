@@ -5,6 +5,7 @@ Generate all dither variants
 Some examples of good values
 """
 
+import os
 import sys
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
@@ -119,8 +120,12 @@ def generateExample(_input, _palette):
 
 
 if __name__ == '__main__':
+	output_path = "./output/"
+	if not os.path.exists(output_path):
+		os.makedirs(output_path)
+
 	img_path = "demoImages/LPlumocrista.png"
-	tmp_crop = "output/LPlumocrista_crop.png"
+	tmp_crop = output_path + "LPlumocrista_crop.png"
 
 	in_img = Image.open(img_path).convert("RGBA")
 	crop_start = [66,215]

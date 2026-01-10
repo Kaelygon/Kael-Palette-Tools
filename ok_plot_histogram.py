@@ -19,7 +19,7 @@ oklab_frame_list = np.load('output/cloudHistogram.npy', allow_pickle=True)
 # Convert all frames to sRGB for plotting
 srgb_frames = []
 for frame in oklab_frame_list:
-	rgb_frame = oklabToSrgb(np.array(frame))
+	rgb_frame = OkLab.oklabToSrgb(np.array(frame))
 	rgb_frame = np.clip(rgb_frame,[0]*3,[1]*3)
 	srgb_frames.append(np.array(rgb_frame))
 

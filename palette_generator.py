@@ -27,8 +27,11 @@ def run_PaletteGenerator(preset):
 
 if __name__ == '__main__':
 	output_path = "./output/"
+	if not os.path.exists(output_path):
+		os.makedirs(output_path)
+
 	preset_pal64 = PalettePreset(
-			sample_method = ["gray", "poisson", "grid", "random"],
+			sample_method = ["gray", "poisson", "grid", "random", "zero"],
 			reserve_transparent=1,
 			img_pre_colors = "palettes/pal64.png",
 			img_fixed_mask = "palettes/pal64-fixed.png",
@@ -48,13 +51,9 @@ if __name__ == '__main__':
 
 			relax_radius = 1.3,
 			relax_count = 1024,
-			use_rand = True,
 			seed = None,
 
 			logging = True
 		)
-
-	if not os.path.exists(output_path):
-		os.makedirs(output_path)
 
 	run_PaletteGenerator(preset_pal64)

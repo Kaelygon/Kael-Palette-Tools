@@ -5,7 +5,9 @@ from PIL import Image
 from dataclasses import dataclass, field
 
 from palette.PalettePreset import *
+from palette.OkLab import *
 from palette.OkTools import *
+from palette.ArrayRandom import *
 
 
 PointType = np.dtype([
@@ -44,8 +46,9 @@ class PointList:
 		#Optional preset
 		if preset != None:
 			self.preset = preset
-			if preset.use_rand == True:
-				self.rand = np.random.default_rng(self.preset.seed)
+			self.rand = ArrayRandom(self.preset.seed)
+			if preset.logging:
+				print("Using seed: " + str(self.rand.state))
 
 
 	def __len__(self):
@@ -62,9 +65,9 @@ class PointList:
 
 	def getSrgbColor(self):
 		if self.type == "linear":
-			return linearToSrgb(self.points["color"])
+			return OkLab.linearToSrgb(self.points["color"])
 		if self.type == "oklab":
-			return oklabToSrgb(self.points["color"])
+			return OkLab.oklabToSrgb(self.points["color"])
 		if self.type == "srgb":
 			return self.points["color"]
 		return None
@@ -73,18 +76,18 @@ class PointList:
 		if self.type == "linear":
 			return self.points["color"]
 		if self.type == "oklab":
-			return oklabToLinear(self.points["color"])
+			return OkLab.oklabToLinear(self.points["color"])
 		if self.type == "srgb":
-			return srgbToLinear(self.points["color"])
+			return OkLab.srgbToLinear(self.points["color"])
 		return None
 
 	def getOklabColor(self):
 		if self.type == "linear":
-			return linearToOklab(self.points["color"])
+			return OkLab.linearToOklab(self.points["color"])
 		if self.type == "oklab":
 			return self.points["color"]
 		if self.type == "srgb":
-			return srgbToOklab(self.points["color"])
+			return OkLab.srgbToOklab(self.points["color"])
 		return None
 
 	def getAsColor(self, type):

@@ -1,65 +1,7 @@
 #OkTools.py
 import numpy as np
 
-
-### Color Conversion ###
-
-def srgbToLinear(srgb: np.ndarray):
-	cutoff = srgb <= 0.04045
-	higher = ((srgb + 0.055) / 1.055) ** 2.4
-	lower = srgb / 12.92
-	return np.where(cutoff, lower, higher)
-
-def linearToSrgb(lin: np.ndarray):
-	lin = np.maximum(lin, 0.0)
-	cutoff = lin <= 0.0031308
-	higher = 1.055 * np.power(lin, 1/2.4) - 0.055
-	lower = lin * 12.92
-	return np.where(cutoff, lower, higher)
-
-def linearToOklab(lin: np.ndarray):
-	r, g, b = lin[...,0], lin[...,1], lin[...,2]
-	l = 0.4122214708*r + 0.5363325363*g + 0.0514459929*b
-	m = 0.2119034982*r + 0.6806995451*g + 0.1073969566*b
-	s = 0.0883024619*r + 0.2817188376*g + 0.6299787005*b
-	
-	l_ = np.sign(l) * np.abs(l) ** (1/3)
-	m_ = np.sign(m) * np.abs(m) ** (1/3)
-	s_ = np.sign(s) * np.abs(s) ** (1/3)
-	
-	L = 0.2104542553*l_ + 0.7936177850*m_ - 0.0040720468*s_
-	a = 1.9779984951*l_ - 2.4285922050*m_ + 0.4505937099*s_
-	b = 0.0259040371*l_ + 0.7827717662*m_ - 0.8086757660*s_
-	
-	return np.stack([L,a,b], axis=-1)
-
-def oklabToLinear(lab: np.ndarray):
-	L, a, b = lab[...,0], lab[...,1], lab[...,2]
-	l_ = L + 0.3963377774*a + 0.2158037573*b
-	m_ = L - 0.1055613458*a - 0.0638541728*b
-	s_ = L - 0.0894841775*a - 1.2914855480*b
-	
-	l = l_**3
-	m = m_**3
-	s = s_**3
-	
-	r = +4.0767416621*l - 3.3077115913*m + 0.2309699292*s
-	g = -1.2684380046*l + 2.6097574011*m - 0.3413193965*s
-	b = -0.0041960863*l - 0.7034186147*m + 1.7076147010*s
-	
-	return np.stack([r,g,b], axis=-1)
-
-def srgbToOklab(col: np.ndarray):
-	linRGB = srgbToLinear(col)
-	oklab = linearToOklab(linRGB)
-	return oklab
-
-def oklabToSrgb(col: np.ndarray):
-	linRGB = oklabToLinear(col)
-	sRGB = linearToSrgb(linRGB)
-	return sRGB
-
-
+from palette.OkLab import *
 
 #Manipulate arrays of colors
 class OkTools:
@@ -73,8 +15,7 @@ class OkTools:
 	OKLAB_BOX_MAX =   np.array( [0.99999999, 0.27456629, 0.19856975] )
 	OKLAB_BOX_SIZE = np.array( [0.99999999, 0.50845387, 0.5100979 ] )
 
-	DARKEST_BLACK_LAB = srgbToOklab(np.array([[0.499/255,0.499/255,0.499/255]]))[0] #brighest 8-bit SRGB that rounds to pure black 
-
+	DARKEST_BLACK_LAB = OkLab.srgbToOklab(np.array([[0.499/255,0.499/255,0.499/255]]))[0] #brighest 8-bit SRGB that rounds to pure black 
 
 
 	### Vec3 Tools ###
@@ -121,7 +62,7 @@ class OkTools:
 	@staticmethod
 	def inOklabGamut(lab_list, eps = 1e-12, lower_bound = 0.0, upper_bound = 1.0, axis=-1):
 		"""bool[] inOklabGamut(float[][3] lab_list, float eps = 1e-12, float lower_bound = 0.0, float upper_bound = 1.0 ))"""
-		lin_list = oklabToLinear(lab_list)
+		lin_list = OkLab.oklabToLinear(lab_list)
 		in_gamut = (lin_list >= lower_bound-eps) & (lin_list <= upper_bound+eps)
 		in_gamut = in_gamut.all(axis=axis)
 		return in_gamut
@@ -129,7 +70,7 @@ class OkTools:
 	@staticmethod
 	def clipToOklabGamut(lab_list, eps = 1e-12, lower_bound = 0.0, upper_bound = 1.0, axis=-1):
 		"""(float[][3] float[][3]) clipToOklabGamut(float[][3] lab_list, float eps = 1e-12, float lower_bound = 0.0, float upper_bound))"""
-		lin_list = oklabToLinear(lab_list)
+		lin_list = OkLab.oklabToLinear(lab_list)
 		out_gamut = (lin_list <= lower_bound-eps) | (lin_list >= upper_bound+eps)
 		out_gamut = out_gamut.any(axis=axis)
 
@@ -137,7 +78,7 @@ class OkTools:
 			return lab_list, None
 
 		new_pos = np.clip(lin_list[out_gamut],[0.0]*3,[1.0]*3)
-		new_lab = linearToOklab(new_pos)
+		new_lab = OkLab.linearToOklab(new_pos)
 
 		clip_move = np.zeros_like(lab_list)
 		clip_move[out_gamut] = new_lab - lab_list[out_gamut] #movement in ok space
@@ -154,7 +95,7 @@ class OkTools:
 	@staticmethod
 	def isOkSrgbGray(lab_list, threshold = 1.0/255.0):
 		"""bool[] isOkSrgbGray(float[][3] lab_list, float threshold = 1.0/255.0))"""
-		rgb_list = oklabToSrgb(lab_list)
+		rgb_list = OkLab.oklabToSrgb(lab_list)
 		is_gray = (
 			(abs(rgb_list[:,0]-rgb_list[:,1]) < threshold) & 
 			(abs(rgb_list[:,1]-rgb_list[:,2]) < threshold)
@@ -175,28 +116,3 @@ class OkTools:
 	@staticmethod
 	def approxOkGap(point_count: int):
 		return (OkTools.OKLAB_GAMUT_VOLUME/max(1,point_count))**(1.0/3.0)
-
-	@staticmethod
-	def xorshift64star(shape, state):
-		rand_arr = (np.arange(0, np.prod(shape), dtype=np.uint64)) + 1 + state
-
-		for _ in range(2):
-			rand_arr ^= rand_arr >> 12
-			rand_arr ^= rand_arr << 25
-			rand_arr ^= rand_arr >> 27
-			rand_arr = rand_arr * 0x2545F4914F6CDD1D
-		
-		state = rand_arr[0]
-		rand_arr = rand_arr.reshape(shape)
-		rand_arr = rand_arr / 2**64
-		return rand_arr, state
-
-	@staticmethod
-	def shuffle(arr, state):
-		if len(arr) == 0:
-			return arr, state
-		order, state = OkTools.xorshift64star(arr.shape[0],state)
-		order = np.argsort(order)
-		order = np.astype(order,np.uint64)
-		arr = arr[order]
-		return arr, state

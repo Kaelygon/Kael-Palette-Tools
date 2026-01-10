@@ -40,7 +40,6 @@ class PalettePreset:
 	sample_attempts: int = 1024 #After this many sample_attempts per point, sampler method will give up
 	relax_count: int = 1024 #number of relax iteration after point sampling
 	
-	use_rand: bool = True # Use numpy rand otherwise use builtin random
 	seed: int = None #None = random seed, [0,UINT64_MAX] = set seeded
 
 	logging: bool = False #Disables stats and some printing
@@ -57,9 +56,6 @@ class PalettePreset:
 
 		if self.max_colors < 1:
 			self.max_colors = 63
-
-		if self.seed == None:
-			self.seed = int(np.random.SeedSequence().entropy)
 
 		#Sample method
 		has_valid_method = False
@@ -89,22 +85,28 @@ class PalettePreset:
 
 			preset_fail = 0
 
-			#All file checks
 			if not os.path.isdir(base_dir):
+				#test if path exists
 				print("Directory "+base_dir+" doesn't exist.")
 				preset_fail = 1
 
 			if is_input[i]:
-				#input file checks
+				#test if exists and can be read
 				if not os.path.exists(file) or not os.access(file, os.R_OK):
 					print("File doesn't exist "+file)
 					preset_fail = 1
 
 			else:
-				#output file checks
-				if not os.access(file, os.W_OK):
-					print("Can't access file "+file)
-					preset_fail = 1
+				if os.path.exists(file):
+					#test if can overwrite
+					if not os.access(file, os.W_OK):
+						print("Can't access file "+file)
+						preset_fail = 1
+				else:
+					#test if can create
+					if not os.access(base_dir, os.W_OK):
+							print("Can't create file " + file)
+							preset_fail = 1
 
 			if preset_fail:
 				setattr(self, attribute, None)

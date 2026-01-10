@@ -16,8 +16,6 @@ class PaletteGenerator:
 	"""
 
 	### Concat generated colors to palette_list.points ###
-
-	#public
 	@staticmethod
 	def populatePointList(palette_list : PointList):
 
@@ -28,10 +26,6 @@ class PaletteGenerator:
 		relax_point_radius = cell_size * preset.relax_radius
 
 		if preset.logging:
-			if preset.use_rand:
-				print("Using seed: " + str(preset.seed))
-			else:
-				print("Using built-in random")
 			print("Using sample_point_radius "+str(round(sample_point_radius,4)))
 			print("Using relax_point_radius "+str(round(relax_point_radius,4)))
 

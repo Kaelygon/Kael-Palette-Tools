@@ -4,6 +4,7 @@ from scipy.spatial import cKDTree
 from PIL import Image
 
 from palette.PointList import *
+from palette.OkLab import *
 from palette.OkTools import *
 from palette.PalettePreset import *
 
@@ -84,6 +85,24 @@ class PointSampler:
 
 		return grid_points
 
+	@staticmethod
+	def _generateEdges(num):
+		steps = np.arange(num)
+		edges = []
+
+		for a in (0, num - 1):
+			for b in (0, num - 1):
+					edges.append(np.stack([steps, np.full(num, a), np.full(num, b)], axis=1))
+					edges.append(np.stack([np.full(num, a), steps, np.full(num, b)], axis=1))
+					edges.append(np.stack([np.full(num, a), np.full(num, b), steps], axis=1))
+
+		edges = np.vstack(edges)
+		edges = edges / max(1,np.max(edges))
+		ok_corners = OkLab.linearToOklab(edges)
+		ok_corners, _ = OkTools.clipToOklabGamut(ok_corners)
+		return ok_corners
+
+
 
 	#convert preset.img_pre_colors to PointList. Luminance in preset.img_fixed_mask makes the point immovable
 	@staticmethod
@@ -98,7 +117,7 @@ class PointSampler:
 		rgba_list = np.array(pre_palette.getdata())
 		rgba_list = rgba_list.astype(float) / np.iinfo(np.uint8).max
 
-		lab_list = srgbToOklab(rgba_list[:,:3])
+		lab_list = OkLab.srgbToOklab(rgba_list[:,:3])
 		alpha_list = rgba_list[:,3]
 
 		fixed_list = np.zeros(len(lab_list), dtype=bool) + True #if no fixed_mask, default=fixed
@@ -120,24 +139,6 @@ class PointSampler:
 		pre_list.points["fixed"] = fixed_list
 
 		return pre_list
-
-	@staticmethod
-	def _generateEdges(num):
-		steps = np.arange(num)
-		edges = []
-
-		for a in (0, num - 1):
-			for b in (0, num - 1):
-					edges.append(np.stack([steps, np.full(num, a), np.full(num, b)], axis=1))
-					edges.append(np.stack([np.full(num, a), steps, np.full(num, b)], axis=1))
-					edges.append(np.stack([np.full(num, a), np.full(num, b), steps], axis=1))
-
-		edges = np.vstack(edges)
-		edges = edges / max(1,np.max(edges))
-		ok_corners = linearToOklab(edges)
-		ok_corners, _ = OkTools.clipToOklabGamut(ok_corners)
-		return ok_corners
-
 
 
 	### Poisson disk sampling ###
@@ -238,8 +239,6 @@ class PointSampler:
 
 			if rand:
 				np_points = rand.random((batch_size, 3))
-			else:
-				np_points, rand_state = OkTools.xorshift64star((batch_size, 3), rand_state)
 			np_points = np_points * OkTools.OKLAB_BOX_SIZE + OkTools.OKLAB_BOX_MIN
 
 			#discard outside gamut
@@ -303,8 +302,6 @@ class PointSampler:
 		#Random order for the regular offsets
 		if rand:
 			rand.shuffle(neighbor_offsets)
-		else:
-			neighbor_offsets, rand_state = OkTools.shuffle(neighbor_offsets,0)
 
 		attempts=0
 		for offset in neighbor_offsets:
@@ -334,8 +331,6 @@ class PointSampler:
 		#to PointList
 		if rand:
 			rand.shuffle(accepted_points) #randomize which points are kept
-		else:
-			accepted_points, rand_state = OkTools.shuffle(accepted_points,0)
 		accepted_points = accepted_points[:point_count]
 		if len(accepted_points):
 			output_list = PointList("oklab", len(accepted_points), 1.0, False)
@@ -371,7 +366,8 @@ class PointSampler:
 		point_count: int = None,
 		point_radius: float = None,
 		minimum: float=0.0,
-		maximum: float=1.0
+		maximum: float=1.0,
+		logging = False
 	):
 		if point_count == None and point_radius:
 			point_count = int(round(1.0/(point_radius)))
@@ -381,5 +377,8 @@ class PointSampler:
 
 		accepted_points = PointList("oklab", point_count, alpha=1.0, fixed=True )
 		accepted_points.points['color'] = lab
+
+		if logging:
+			print("PointSampler grayscale() generated " + str(len(accepted_points)) + " points.")
 
 		return accepted_points

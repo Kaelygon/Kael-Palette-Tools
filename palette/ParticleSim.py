@@ -180,7 +180,7 @@ class ParticleSim:
 		)"""
 		## Get neighbors of each point within its radius
 		point_tree = cKDTree(particles.pos)
-		neighbors_list = point_tree.query_ball_point(particles.pos, r=particles.radius * search_radius)
+		neighbors_list = point_tree.query_ball_point(particles.pos, r=particles.radius * search_radius) #jagged python array [ [p0 idxs], [p1 idxs], ... ]
 
 		#every point has different number of neighbors, vectorize with padding
 		neighbors_count = np.fromiter((len(row) for row in neighbors_list), dtype=np.int64) - 1 # -1 self will be removed
@@ -188,8 +188,8 @@ class ParticleSim:
 		n_pad_width = np.clip(n_pad_width,1,max_neighbors)
 		n_pad_idxs = np.full((len(neighbors_list), n_pad_width), -1, dtype=int) #(p_count,n_count) int
 		for i, neighbor_idxs in enumerate(neighbors_list):
-			if i in neighbor_idxs:
-				neighbor_idxs.remove(i) #remove self
+			neighbor_idxs = np.array(neighbor_idxs)
+			neighbor_idxs = neighbor_idxs[neighbor_idxs != i] #remove self
 			n_pad_idxs[i, :neighbors_count[i]] = neighbor_idxs[:n_pad_width]
 
 		#invalid neighbors contain garbage, so make sure to clear invalid idxs
@@ -269,7 +269,8 @@ class ParticleSim:
 
 		if anneal_steps == None:
 			anneal_steps = max(1, min(iterations//16, 16))
-		relax_end_steps = 4*anneal_steps #Allow start and end relax longer 
+		relax_start_steps = iterations/8 #Allow start and end relax longer 
+		relax_end_steps = iterations/4
 
 		particles = ParticleType(point_list, approx_radius)
 		rand=point_list.rand
@@ -403,7 +404,7 @@ class ParticleSim:
 
 			## Adaptive radius scale
 			if(
-				iterations-tick >= relax_end_steps and #last trigger
+				iterations-tick >= relax_start_steps and #last trigger
 				tick >= relax_end_steps and #first
 				tick%anneal_steps==0 #periodic
 			):

@@ -4,6 +4,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 from palette.PointList import *
+from palette.OkLab import *
 from palette.OkTools import *
 
 class PointListStats:
@@ -32,7 +33,7 @@ class PointListStats:
 		pair_dists = pair_dists[sorted_idxs]
 
 		#srgb is only used for hex printing
-		srgb_list = oklabToSrgb(color_list)
+		srgb_list = OkLab.oklabToSrgb(color_list)
 		srgb_pairs = srgb_list[pair_idxs]
 
 		#Print smallest and biggest pair gaps and their hex values

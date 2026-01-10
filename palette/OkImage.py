@@ -7,6 +7,7 @@ from numba import njit
 import os.path
 
 from palette.OrderedDither import *
+from palette.OkLab import *
 from palette.OkTools import *
 
 @dataclass
@@ -120,7 +121,7 @@ class OkImage:
 		in_img = Image.open(img_path).convert("RGBA")
 		col_list = np.array(in_img, dtype=np.float64) / 255.0
 		col_list = col_list.reshape(-1, 4)
-		col_list[:,:3] = srgbToOklab(col_list[:,:3])
+		col_list[:,:3] = OkLab.srgbToOklab(col_list[:,:3])
 		col_list[:,:3] = self._quantize(col_list[:,:3], int(1.0/OkTools.OKLAB_8BIT_MARGIN))
 
 		self.pixels = col_list
@@ -129,7 +130,7 @@ class OkImage:
 
 	def saveImage(self, output_path: str):
 		col_list = self.pixels_output.copy()
-		col_list[:,:3] = oklabToSrgb(col_list[:,:3])
+		col_list[:,:3] = OkLab.oklabToSrgb(col_list[:,:3])
 		rgba = np.clip(np.round(col_list * 255), 0, 255).astype(np.uint8)
 		rgba = rgba.reshape((self.height, self.width, 4))
 		img = Image.fromarray(rgba, "RGBA")

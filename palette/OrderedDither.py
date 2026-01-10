@@ -8,7 +8,7 @@ class OrderedDither:
 	#Normalize 3D matrix slices to (-0.5,0.5)
 	@staticmethod
 	def _normSlices(matrix):
-		matrix = matrix.astype(float)
+		matrix = matrix.astype(np.float32)
 		for s in range(matrix.shape[2]):
 			slice = matrix[:,:,s]
 			slice = slice - np.min(slice) #[max,min] -> [max-min,0]
@@ -90,8 +90,8 @@ class OrderedDither:
 
 		avg_invert = 1.0-neighborhood_avg
 		new_pos = pixels*(1.0-weight) + avg_invert*(weight)
-		pixels = OrderedDither._normSlices(new_pos)
 
+		pixels = OrderedDither._normSlices(new_pos) #required to evens out ranks betweens slices
 		pixels = OrderedDither._rankMatrix(pixels,height,width,channel_count)
 		pixels = OrderedDither._normSlices(pixels)
 	

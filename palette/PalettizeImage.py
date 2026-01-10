@@ -106,6 +106,12 @@ class PalettizeImage:
 
 		unique_list = src_img.unique_list
 		palette_list = palette_img.unique_list
+
+		if unique_list is None:
+			raise Exception("src_img Unique_list missing!")
+		if palette_list is None:
+			raise Exception("palette_img Unique_list missing!")
+
 		pal_length = len(palette_list.color)
 
 		max_radius = OkTools.approxOkGap(pal_length) * max_error
@@ -120,7 +126,7 @@ class PalettizeImage:
 		search_radius = 1.0 + max_error
 		est_maxk = packing_density * search_radius**3 + 1.0 #How many palette colors within r=max_error
 		k_count = max(2, min(pal_length,est_maxk) )
-		dists, idxs = pal_tree.query(unique_list.color, k = int(k_count))
+		dists, idxs = pal_tree.query(unique_list.color, k = int(k_count), workers=-1)
 		
 		#choose palette index for each color
 		unique_count = len(unique_list.color)
@@ -169,7 +175,6 @@ class PalettizeImage:
 			axis_count = int(1.0/axis_step_size)
 			image_ok.quantizeAxes(axis_count)
 		image_ok.quantizeAlpha(preset.alpha_count)
-		image_ok.createUniqueList()
 
 		#replace original img pixels with convert_dict
 		if preset.dither == "bayer":
@@ -183,6 +188,7 @@ class PalettizeImage:
 
 		elif preset.dither == "none":
 			if preset.max_error:
+				image_ok.createUniqueList() #only _createWeightedPalette requires source image UniqueList
 				#choose closest within max_error weighted by area
 				unique_palettized = PalettizeImage._createWeightedPalette(image_ok, palette_ok, preset.max_error)
 				image_ok.applyPalette(unique_palettized)
@@ -203,8 +209,9 @@ class PalettizeImage:
 		image_ok.saveImage(preset.output)
 		print("Saved image "+preset.output)
 
-		print("\nColor quant-error")
-		image_ok.printImgError()
+		if preset.print_stats:
+			print("\nColor quant-error")
+			image_ok.printImgError()
 
 
 
@@ -268,6 +275,12 @@ class PalettizeImage:
 			dest='demo',
 			help="Generate test images"
 		)
+		parser.add_argument(
+			'-S', '--stats',  type=str,
+			default="False",
+			dest='print_stats',
+			help="Print quant error"
+		)
 
 		if len(argv)<=1: #No args
 			argv.append("--help")
@@ -290,6 +303,7 @@ class PalettizeImage:
 			dither			= None,
 			mask_size		= int(arg_list.mask_size),
 			mask_weight		= float(arg_list.mask_weight),
+			print_stats		= str(arg_list.print_stats),
 		)
 
 

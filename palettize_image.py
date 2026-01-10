@@ -29,6 +29,6 @@ if __name__ == '__main__':
 		for arg in lazy_arguments:
 			argv.append(arg)
 
-	d_preset = Palettize_parser(argv)
+	d_preset = PalettizeImage.parser(argv)
 	if d_preset:
-		Palettize_preset(d_preset)
+		PalettizeImage.usePreset(d_preset)

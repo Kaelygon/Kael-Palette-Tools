@@ -1,4 +1,5 @@
 import numpy as np
+from palette.ArrayRandom import *
 
 """
 ordered. namespace matrix creation tools
@@ -72,7 +73,8 @@ class ordered:
 		if height<1 or width<1:
 			return ordered._fallbackMatrix(channel_count)
 
-		pixels = np.random.rand(height,width,channel_count)
+		rand = ArrayRandom(0)
+		pixels = rand.random((height,width,channel_count))
 
 		#pixels relative to current
 		top	= np.roll(pixels, shift=(-1, 0, 0), axis=(0,1,2))

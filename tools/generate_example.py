@@ -77,7 +77,7 @@ def generateExample(_input, _palette):
 	]
 
 	for preset in preset_list:
-		Palettize_preset( preset )
+		PalettizeImage.usePreset( preset )
 		print("---")
 
 	concat_img = None

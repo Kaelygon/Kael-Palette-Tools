@@ -34,13 +34,14 @@ class OrderedDither:
 	@staticmethod
 	def _fallbackMatrix():
 		amogus = (343150 >> np.arange(25) & 1).reshape(5,5) - 0.5 #343150x10 = 5x5 amogus in binary
-		m = np.stack([amogus]*3, axis=2)
-		return m[:,:,0], m[:,:,1], m[:,:,2]
+		m = np.stack([amogus]*4, axis=2)
+		return m[:,:,0], m[:,:,1], m[:,:,2], m[:,:,3]
 
 	#Bayer
-	#Take first 3 slices of 3D bayer matrix with side length of n, normalized to -0.5,0.5
+	#Take first 4 slices of 3D bayer matrix with side length of n, normalized to -0.5,0.5
 	@staticmethod
-	def bayerOklab(size, depth=3):
+	def bayerOklab(size):
+		depth=4
 		if size<1:
 			return OrderedDither._fallbackMatrix()
 
@@ -64,13 +65,15 @@ class OrderedDither:
 		m_l = b_m[:,:,0]
 		m_a = b_m[:,:,1]
 		m_b = b_m[:,:,2]
-		return m_l, m_a, m_b
+		m_o = b_m[:,:,3]
+		return m_l, m_a, m_b, m_o
 
 
 	#Blue noise
 	#lerp (white noise) -> (1 - avg neighborhood)
 	#weight=0 is white noise, weight=1 is neighborhood avg
-	def blueNoiseOklab(height, width, weight=0.64, channel_count = 3):
+	def blueNoiseOklab(height, width, weight=0.64):
+		channel_count = 4
 		if height<1 or width<1:
 			return OrderedDither._fallbackMatrix()
 
@@ -98,4 +101,5 @@ class OrderedDither:
 		m_l = pixels[:,:,0]
 		m_a = pixels[:,:,1]
 		m_b = pixels[:,:,2]
-		return m_l, m_a, m_b
+		m_o = pixels[:,:,3]
+		return m_l, m_a, m_b, m_o

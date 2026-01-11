@@ -52,7 +52,8 @@ Options:
 
 -d, --dither        (str  ) Dither type. Options: none, bayer, steinberg
 -ms, --mask-size    (int  ) Dither mask tile size for dither=(bayer, blue) 
--dw, --mask-weight  (float) Dither strength for dither=(none, bayer). >1.0 May over-dither but results in smoother gradients and better colors
+-dw, --mask-weight  (float) Dither strength for dither=(none, bayer). dither = 0.0 none, 1.0 normal, 2.0 more
+
 -S,  --stats		  (bool ) Print palettization error
 ```
 

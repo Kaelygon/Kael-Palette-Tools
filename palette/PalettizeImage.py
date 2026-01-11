@@ -174,14 +174,13 @@ class PalettizeImage:
 			axis_step_size = OkTools.approxOkGap(pal_length) * preset.merge_radius
 			axis_count = int(1.0/axis_step_size)
 			image_ok.quantizeAxes(axis_count)
-		image_ok.quantizeAlpha(preset.alpha_count)
 
 		#replace original img pixels with convert_dict
 		if preset.dither == "bayer":
-			image_ok.ditherOrdered(palette_ok, preset.mask_size, preset.mask_weight)
+			image_ok.ditherOrdered(palette_ok, preset.mask_size, preset.mask_weight, preset.alpha_count)
 
 		elif preset.dither == "blue":
-			image_ok.ditherBlue(palette_ok, preset.mask_size, preset.mask_weight)
+			image_ok.ditherBlue(palette_ok, preset.mask_size, preset.mask_weight, preset.alpha_count)
 
 		elif preset.dither == "steinberg":
 			image_ok.ditherFloydSteinberg(palette_ok)

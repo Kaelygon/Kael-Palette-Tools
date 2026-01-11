@@ -131,8 +131,8 @@ class OkImage:
 		step_count = int(max(1,step_count))
 		return np.round(vals*step_count)/step_count
 
-	def _applyDitherThresholds(self, pixels, thresholds_lab, palette_gaps, pal_list: UniqueList):
-		m_l, m_a, m_b = thresholds_lab
+	def _applyDitherThresholds(self, pixels, thresholds_lab, palette_gaps, pal_list: UniqueList, alpha_count, alpha_weight):
+		m_l, m_a, m_b, m_o = thresholds_lab
 		y_idxs, x_idxs = np.divmod(np.arange(self.height*self.width), self.width)
 
 		t_y_idxs = y_idxs % m_l.shape[0]
@@ -140,14 +140,19 @@ class OkImage:
 		t_l = m_l[t_y_idxs, t_x_idxs]
 		t_a = m_a[t_y_idxs, t_x_idxs]
 		t_b = m_b[t_y_idxs, t_x_idxs]
+		t_o = m_o[t_y_idxs, t_x_idxs]
 
 		thresholds_stack = np.stack((t_l, t_a, t_b), axis=1)
-		new_pixels = pixels + thresholds_stack * palette_gaps
+		pixels[:,:3]+= thresholds_stack * palette_gaps
 
 		pal_tree = pal_list.getUniqueTree()
-		_, idxs = pal_tree.query(new_pixels, k=1, workers=-1)
-		new_pixels = pal_list.color[idxs]
-		return new_pixels
+		_, idxs = pal_tree.query(pixels[:,:3], k=1, workers=-1)
+		pixels[:,:3] = pal_list.color[idxs]
+
+		if alpha_count:
+			pixels[:, 3]+= t_o * alpha_weight/np.float32(alpha_count)
+			pixels[:, 3] = self._quantize(pixels[:, 3], alpha_count)
+		return pixels
 
 
 	#public
@@ -194,7 +199,7 @@ class OkImage:
 		unique_view, unique_idxs, original_idxs = np.unique(pixels_view, return_index=True, return_inverse=True)
 		unique_colors = pixels[unique_idxs,:3]
 
-		opaque = pixels[:, 3] > (0.51 / 255.0)
+		opaque = pixels[:, 3] / 1.0
 		area = np.bincount(
 			original_idxs,
 			weights=opaque,
@@ -223,47 +228,50 @@ class OkImage:
 		self.pixels_output[:,:3] = pal_list.color[:,:3][idxs]
 
 	#https://bisqwit.iki.fi/story/howto/dither/jy/
-	def ditherOrdered(self, palette_img, matrix_size=16, dither_weight=1.0):
+	def ditherOrdered(self, palette_img, matrix_size=16, dither_weight=1.0, alpha_count=1):
 		pal_list = palette_img.unique_list
-		pixels = self.pixels_output[:,:3]
+		pixels = self.pixels_output #lab+alpha
 		pal_tree = pal_list.getUniqueTree()
 
 		#Channel gaps of nearest 2 palette colors to current pixel
-		pal_dists, idxs = pal_tree.query(pixels, k=2, workers=-1)
-		palette_gaps = np.abs(pal_list.color[idxs[:,1]] - pal_list.color[idxs[:,0]])
+		pal_dists, idxs = pal_tree.query(pixels[:,:3], k=2, workers=-1)
+		palette_gaps = np.abs(pal_list.color[idxs[:,1]] - pal_list.color[idxs[:,0]]) #lab
 
-		#scale by gap norm weighted by distance
-		if dither_weight!=0.0:
-			# vec_b -> vec_a : fac(0 -> 1)
-			def np_lerp(vec_a, vec_b, fac):
-				return vec_a * (1.0-fac) + vec_b * fac
+		#0.0 = no dither, 1.0 = normal dither, 2.0 more dither
+		# 1.0 to 2.0 : palette_gaps -> palette_gaps_norm
+		max_pal_dist = np.max(pal_dists[:,0])
+		gater = pal_dists[:,0]/max_pal_dist
+		gater = np.maximum(0.0, gater * (dither_weight - 1.0))
 
-			palette_gaps_norm = OkTools.vec3Length(palette_gaps,axis=1)[:,None]*[1,1,1] #smoothest and best colors but over-dithers with some palettes
+		palette_gaps_norm = OkTools.vec3Length(palette_gaps,axis=1)[:,None]*[1,1,1]
+		palette_gaps = OkTools.vec3Lerp(palette_gaps, palette_gaps_norm, gater[:,None]*[1,1,1])
 
-			#limit over-dither
-			max_pal_dist = np.max(pal_dists[:,0])
-			gater = pal_dists[:,0]/max_pal_dist
-			gater = gater + max(0.0, dither_weight - 1.0) #1.0-2.0 raises minimum
-			gater = np.clip(gater * dither_weight, 0.0, 1.0)
+		alpha_weight=1.0
+		if dither_weight < 1.0:
+			# 0.0 to 1.0, removes dither
+			palette_gaps*=dither_weight
+			alpha_weight =dither_weight
 
-			palette_gaps = np_lerp(palette_gaps, palette_gaps_norm, gater[:,None]*[1,1,1])
+		thresholds_lab = OrderedDither.bayerOklab(matrix_size) #lab+alpha
 
-		thresholds_lab = OrderedDither.bayerOklab(matrix_size)
+		self.pixels_output = self._applyDitherThresholds(pixels, thresholds_lab, palette_gaps, pal_list, alpha_count, alpha_weight)
 
-		self.pixels_output[:,:3] = self._applyDitherThresholds(pixels, thresholds_lab, palette_gaps, pal_list)
-
-	def ditherBlue(self, palette_img, matrix_size=16, dither_weight=1.0):
+	def ditherBlue(self, palette_img, matrix_size=16, dither_weight=1.0, alpha_count=1):
 		pal_list = palette_img.unique_list
-		pixels = self.pixels_output[:,:3]
+		pixels = self.pixels_output
 		pal_tree = pal_list.getUniqueTree()
 
-		pal_dists, idxs = pal_tree.query(pixels, k=2, workers=-1)
+		pal_dists, idxs = pal_tree.query(pixels[:,:3], k=2, workers=-1)
 		palette_gaps = np.abs(pal_list.color[idxs[:,1]] - pal_list.color[idxs[:,0]])
 
 		blue_thresholds = OrderedDither.blueNoiseOklab(matrix_size,matrix_size)
 		blue_thresholds = np.array(blue_thresholds) * dither_weight
 
-		self.pixels_output[:,:3] = self._applyDitherThresholds(pixels, blue_thresholds, palette_gaps, pal_list)
+		alpha_weight=1.0
+		if dither_weight < 1.0:
+			alpha_weight = dither_weight
+
+		self.pixels_output = self._applyDitherThresholds(pixels, blue_thresholds, palette_gaps, pal_list, alpha_count, alpha_weight)
 
 
 	def ditherFloydSteinberg(self, palette_img):

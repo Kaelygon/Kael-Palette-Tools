@@ -56,7 +56,7 @@ def generateExample(_input, _palette):
 			alpha_count		= 1,
 			dither			= method_list[1],
 			mask_size		= 16,
-			mask_weight		= 1.0,
+			mask_weight		= 2.0,
 		),
 		ConvertPreset(
 			image				= _input,

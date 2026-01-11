@@ -36,6 +36,10 @@ class OkTools:
 		norm[np.all(vector_list == 0, axis=axis)] = OkTools.FALLBACK_NORM
 		return norm, np.squeeze(l, axis=-1)
 
+	# vec_b -> vec_a : fac(0 -> 1)
+	def vec3Lerp(vec_a, vec_b, fac):
+		return vec_a * (1.0-fac) + vec_b * fac
+
 	#Generate surface normals of n points evenly distributed on a sphere
 	#offset (n,m) shifts the points on surface
 	@staticmethod

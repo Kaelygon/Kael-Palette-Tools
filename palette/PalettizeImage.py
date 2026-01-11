@@ -265,8 +265,8 @@ class PalettizeImage:
 		)
 		parser.add_argument(
 			'-dw', '--mask-weight', type=str,
-			default="16",
-			help="Dither strength for dither=(none, bayer)"
+			default="1.0",
+			help="Dither strength for dither=(bayer, blue)"
 		)
 		parser.add_argument(
 			'-D', '--demo',  type=str,

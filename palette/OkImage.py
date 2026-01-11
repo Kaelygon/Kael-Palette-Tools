@@ -42,30 +42,61 @@ class ConvertPreset:
 
 #### Image conversion ###
 
-@njit
-def OkImage_njitFloydSteinberg(pixels:np.ndarray, pal_colors:np.ndarray, width:int, height:int):
-	for i in range(pixels.shape[0]):
-		y = i // width
-		x = i - y * width
+@njit(fastmath=True)
+def OkImage_njitFloydSteinberg(pixels:np.ndarray, pal_colors:np.ndarray, width:int, height:int, margin:float):
+	i=-1
+	margin_sq = margin*margin
+	pal_len = pal_colors.shape[0]
+	for y in range(height):
+		for x in range(width):
+			i+=1
 
-		old_pixel = pixels[i].copy()
+			min_dist_sq = 1e10
+			best_idx = 0
+			for j in range(pal_len):
+				diff_l = pal_colors[j, 0] - pixels[i, 0]
+				diff_a = pal_colors[j, 1] - pixels[i, 1]
+				diff_b = pal_colors[j, 2] - pixels[i, 2]
+				dist_sq = diff_l*diff_l + diff_a*diff_a + diff_b*diff_b
+				if dist_sq < min_dist_sq:
+					min_dist_sq = dist_sq
+					best_idx = j
+					if dist_sq <= margin_sq:
+						break
 
-		diffs = pal_colors - old_pixel
-		dists = np.sum(diffs*diffs, axis=1)
-		new_pixel = pal_colors[np.argmin(dists)]
+			#quant_error = (old_pixels - new_pixels)/16.0
+			quant_error_l = (pixels[i, 0] - pal_colors[best_idx, 0])/16.0
+			quant_error_a = (pixels[i, 1] - pal_colors[best_idx, 1])/16.0
+			quant_error_b = (pixels[i, 2] - pal_colors[best_idx, 2])/16.0
 
-		pixels[i] = new_pixel
-		quant_error = (old_pixel - new_pixel)/16.0
+			#pixels = new_pixels
+			pixels[i, 0] = pal_colors[best_idx, 0]
+			pixels[i, 1] = pal_colors[best_idx, 1]
+			pixels[i, 2] = pal_colors[best_idx, 2]
 
-		if x + 1 < width:
-			pixels[i + 1] 			+= quant_error * 7.0
-		if x - 1 >= 0 and y + 1 < height:
-			pixels[i + width - 1]+= quant_error	* 3.0
-		if y + 1 < height:
-			pixels[i + width] 	+= quant_error * 5.0
-		if x + 1 < width and y + 1 < height:
-			pixels[i + width + 1]+= quant_error	* 1.0
+			if y + 1 < height: #bottom
+				j = i + width
+				pixels[j, 0] += quant_error_l * 5.0
+				pixels[j, 1] += quant_error_a * 5.0
+				pixels[j, 2] += quant_error_b * 5.0
+				if x - 1 >= 0: #bottom left
+					j = i + width - 1	
+					pixels[j, 0] += quant_error_l * 3.0
+					pixels[j, 1] += quant_error_a * 3.0
+					pixels[j, 2] += quant_error_b * 3.0
+				if x + 1 < width: #bottom right
+					j=i + width + 1
+					pixels[j, 0] += quant_error_l
+					pixels[j, 1] += quant_error_a
+					pixels[j, 2] += quant_error_b
+			if x + 1 < width: #right
+				j = i + 1
+				pixels[j, 0] += quant_error_l * 7.0
+				pixels[j, 1] += quant_error_a * 7.0
+				pixels[j, 2] += quant_error_b * 7.0
+
 	return pixels
+
 
 #striped list. item = (color[i],alpha[i],area[i])
 @dataclass
@@ -239,9 +270,7 @@ class OkImage:
 		pixels = self.pixels_output[...,:3]
 		pal_colors = palette_img.unique_list.color
 
-		pixels = OkImage_njitFloydSteinberg(pixels, pal_colors, self.width, self.height)
-
-		self.pixels_output[...,:3] = pixels
+		self.pixels_output[...,:3] = OkImage_njitFloydSteinberg(pixels, pal_colors, self.width, self.height, OkTools.OKLAB_8BIT_MARGIN)
 
 	def printImgError(self):
 		quant_delta = self.pixels_output - self.pixels

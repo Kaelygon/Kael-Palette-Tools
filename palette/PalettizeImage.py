@@ -316,6 +316,12 @@ class PalettizeImage:
 			print("Defaulting to \"none\"")
 			d_preset.dither = "none"
 
+		if arg_list.palette == None:
+			print("Missing argument -p, --palette <file>")
+			return None
+		if arg_list.input == None:
+			print("Missing argument -i, --input <file>")
+			return None
 
 		#assign output
 		if arg_list.input != None:

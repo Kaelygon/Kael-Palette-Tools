@@ -48,7 +48,7 @@ class PointList:
 			self.preset = preset
 			self.rand = ArrayRandom(self.preset.seed)
 			if preset.logging:
-				print("Using seed: " + str(self.rand.state))
+				print("Using seed: " + str(self.rand._seed))
 
 
 	def __len__(self):

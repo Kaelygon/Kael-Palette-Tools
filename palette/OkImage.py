@@ -169,7 +169,7 @@ class OkImage:
 		rgba = np.ascontiguousarray(rgba, dtype=np.uint8)
 		rgba = rgba.reshape((self.height, self.width, 4))
 		img = Image.fromarray(rgba, "RGBA")
-		img.save(output_path)
+		img.save(output_path, compress_level=1)
 
 	def quantizeAxes(self, step_count: int):
 		quant_lab = self._quantize(self.pixels_output[:,:3], step_count)
@@ -188,11 +188,11 @@ class OkImage:
 
 	def createUniqueList(self):
 		pixels = self.pixels_output
-		laba_dtype = np.dtype((np.void, pixels.dtype.itemsize * pixels.shape[1]))
-		pixels_view = pixels.view(laba_dtype).ravel()
+		lab_dtype = np.dtype((np.void, pixels.dtype.itemsize * 3))
+		pixels_view = pixels[:,:3].view(lab_dtype).ravel()
 
 		unique_view, unique_idxs, original_idxs = np.unique(pixels_view, return_index=True, return_inverse=True)
-		unique_colors = pixels[unique_idxs]
+		unique_colors = pixels[unique_idxs,:3]
 
 		opaque = pixels[:, 3] > (0.51 / 255.0)
 		area = np.bincount(
@@ -202,13 +202,13 @@ class OkImage:
 		)
 
 		self.unique_list = UniqueList(
-			unique_colors[:,:3],
-			unique_colors[:, 3],
+			unique_colors,
+			pixels[unique_idxs,3],
 			area,
 			unique_idxs,
 			original_idxs
 		)
-		self.unique_list.color = np.ascontiguousarray(self.unique_list.color, dtype=np.float64)
+		self.unique_list.color = np.ascontiguousarray(self.unique_list.color, dtype=np.float32)
 
 	#### palettize methods ###
 	def applyPalette(self, unique_palettized):

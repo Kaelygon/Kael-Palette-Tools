@@ -43,10 +43,11 @@ class ConvertPreset:
 #### Image conversion ###
 
 @njit(fastmath=True)
-def OkImage_njitFloydSteinberg(pixels:np.ndarray, pal_colors:np.ndarray, width:int, height:int, margin:float):
-	i=-1
-	margin_sq = margin*margin
-	pal_len = pal_colors.shape[0]
+def OkImage_njitFloydSteinberg(pixels:np.ndarray, pal_colors:np.ndarray, alpha_count:int, width:int, height:int, margin:float):
+	i: int=-1
+	margin_sq: float = margin*margin
+	pal_len: int = pal_colors.shape[0]
+	alpha_step: float = 1.0/alpha_count
 	for y in range(height):
 		for x in range(width):
 			i+=1
@@ -69,31 +70,40 @@ def OkImage_njitFloydSteinberg(pixels:np.ndarray, pal_colors:np.ndarray, width:i
 			quant_error_a = (pixels[i, 1] - pal_colors[best_idx, 1])/16.0
 			quant_error_b = (pixels[i, 2] - pal_colors[best_idx, 2])/16.0
 
+			#int trunacte rounding trick
+			new_alpha = float( int((pixels[i, 3]+alpha_step/2.0)/alpha_step) )*alpha_step
+			alpha_error = (pixels[i, 3] - new_alpha)/16.0
+
 			#pixels = new_pixels
 			pixels[i, 0] = pal_colors[best_idx, 0]
 			pixels[i, 1] = pal_colors[best_idx, 1]
 			pixels[i, 2] = pal_colors[best_idx, 2]
+			pixels[i, 3] = new_alpha
 
 			if y + 1 < height: #bottom
 				j = i + width
 				pixels[j, 0] += quant_error_l * 5.0
 				pixels[j, 1] += quant_error_a * 5.0
 				pixels[j, 2] += quant_error_b * 5.0
+				pixels[j, 3] += alpha_error * 5.0
 				if x - 1 >= 0: #bottom left
 					j = i + width - 1	
 					pixels[j, 0] += quant_error_l * 3.0
 					pixels[j, 1] += quant_error_a * 3.0
 					pixels[j, 2] += quant_error_b * 3.0
+					pixels[j, 3] += alpha_error * 3.0
 				if x + 1 < width: #bottom right
 					j=i + width + 1
 					pixels[j, 0] += quant_error_l
 					pixels[j, 1] += quant_error_a
 					pixels[j, 2] += quant_error_b
+					pixels[j, 3] += alpha_error
 			if x + 1 < width: #right
 				j = i + 1
 				pixels[j, 0] += quant_error_l * 7.0
 				pixels[j, 1] += quant_error_a * 7.0
 				pixels[j, 2] += quant_error_b * 7.0
+				pixels[j, 3] += alpha_error * 7.0
 
 	return pixels
 
@@ -161,7 +171,8 @@ class OkImage:
 		col_list = np.ascontiguousarray(in_img, dtype=np.float32)
 		col_list = col_list.reshape(-1, 4) / 255.0
 		col_list[:,:3] = OkLab.srgbToOklab(col_list[:,:3])
-		col_list[:,:3] = self._quantize(col_list[:,:3], int(1.0/OkTools.OKLAB_8BIT_MARGIN))
+		ok_steps = int(np.ceil(1.0/OkTools.OKLAB_8BIT_MARGIN))
+		col_list[:,:3] = self._quantize(col_list[:,:3], ok_steps)
 
 		self.pixels = col_list
 		self.pixels_output = self.pixels.copy()
@@ -243,8 +254,8 @@ class OkImage:
 		gater = pal_dists[:,0]/max_pal_dist
 		gater = np.maximum(0.0, gater * (dither_weight - 1.0))
 
-		palette_gaps_norm = OkTools.vec3Length(palette_gaps,axis=1)[:,None]*[1,1,1]
-		palette_gaps = OkTools.vec3Lerp(palette_gaps, palette_gaps_norm, gater[:,None]*[1,1,1])
+		palette_gaps_length = OkTools.vec3Length(palette_gaps,axis=1)[:,None]*[1,1,1]
+		palette_gaps = OkTools.vec3Lerp(palette_gaps, palette_gaps_length, gater[:,None]*[1,1,1])
 
 		alpha_weight=1.0
 		if dither_weight < 1.0:
@@ -274,11 +285,18 @@ class OkImage:
 		self.pixels_output = self._applyDitherThresholds(pixels, blue_thresholds, palette_gaps, pal_list, alpha_count, alpha_weight)
 
 
-	def ditherFloydSteinberg(self, palette_img):
-		pixels = self.pixels_output[...,:3]
+	def ditherFloydSteinberg(self, palette_img, alpha_count):
+		pixels = self.pixels_output
 		pal_colors = palette_img.unique_list.color
 
-		self.pixels_output[...,:3] = OkImage_njitFloydSteinberg(pixels, pal_colors, self.width, self.height, OkTools.OKLAB_8BIT_MARGIN)
+		self.pixels_output = OkImage_njitFloydSteinberg(
+			pixels, 
+			pal_colors, 
+			max(1,alpha_count), 
+			self.width, 
+			self.height, 
+			OkTools.OKLAB_8BIT_MARGIN
+		)
 
 	def printImgError(self):
 		quant_delta = self.pixels_output - self.pixels

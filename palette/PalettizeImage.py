@@ -183,7 +183,7 @@ class PalettizeImage:
 			image_ok.ditherBlue(palette_ok, preset.mask_size, preset.mask_weight, preset.alpha_count)
 
 		elif preset.dither == "steinberg":
-			image_ok.ditherFloydSteinberg(palette_ok)
+			image_ok.ditherFloydSteinberg(palette_ok, preset.alpha_count)
 
 		elif preset.dither == "none":
 			if preset.max_error:

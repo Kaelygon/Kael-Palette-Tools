@@ -278,16 +278,22 @@ class OkImage_Filter:
 
 		#preset.mask_weight rules dither
 		# 0.0 to 1.0 : 0.0 -> palette_gaps
-		# 1.0 to 2.0 : palette_gaps -> palette_gaps_norm
-		max_pal_dist = np.max(pal_dists[:,1])
+		# 1.0 to 2.0 : palette_gaps -> palette_gaps_length
+		#Normalize gater
+		gater = pal_dists[:,1]
+		gater = gater - np.min(gater)
+		max_pal_dist = np.max(gater)
 		gater = pal_dists[:,1]/(max_pal_dist+1e-12)
 		gater = gater[:,None]*[1,1,1]
+		palette_gaps*=gater
 
-		if preset.mask_weight < 1.0:
-			palette_gaps = OkTools.vec3Lerp(np.zeros_like(palette_gaps), palette_gaps, gater)
+		if preset.mask_weight <= 1.0:
+			weight = preset.mask_weight
+			palette_gaps = OkTools.vec3Lerp(np.zeros_like(palette_gaps), palette_gaps, weight)
 		else:
+			weight = preset.mask_weight - 1.0
 			palette_gaps_length = OkTools.vec3Length(palette_gaps,axis=1)[:,None]*[1,1,1]
-			palette_gaps = OkTools.vec3Lerp(palette_gaps, palette_gaps_length, gater)
+			palette_gaps = OkTools.vec3Lerp(palette_gaps, palette_gaps_length, weight)
 
 		#Create dither mask
 		if preset.dither == "bayer":

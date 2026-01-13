@@ -58,7 +58,7 @@ def generateExample(_input, _palette):
 			alpha_count		= 1,
 			dither			= method_list[1],
 			mask_size		= 16,
-			mask_weight		= 2.0,
+			mask_weight		= 1.0,
 		),
 		OkImage.Preset(
 			image				= _input,
@@ -135,5 +135,5 @@ if __name__ == '__main__':
 	in_img = in_img.crop( crop_start + crop_end )
 	in_img.save(tmp_crop)
 
-	generateExample(tmp_crop, "palettes/pal64.png")
+	generateExample(tmp_crop, "palettes/pal256.png")
 	os.remove(tmp_crop)

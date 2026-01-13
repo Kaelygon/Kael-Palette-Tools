@@ -5,7 +5,7 @@ from matplotlib.widgets import Slider, Button
 import numpy as np
 import matplotlib.animation as animation
 
-from palette.OkTools import *
+from palette import OkTools, OkLab
 
 """
 thanks for chat gee pee tee for this absolute mess of a script

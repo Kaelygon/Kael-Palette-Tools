@@ -4,10 +4,10 @@ import numpy as np
 from PIL import Image
 from dataclasses import dataclass, field
 
-from palette.PalettePreset import *
-from palette.OkLab import *
-from palette.OkTools import *
-from palette.ArrayRandom import *
+from .PalettePreset import PalettePreset
+from .OkLab import OkLab
+from .OkTools import OkTools
+from .ArrayRandom import ArrayRandom
 
 
 PointType = np.dtype([

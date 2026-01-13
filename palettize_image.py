@@ -5,12 +5,11 @@ Palettize and dither using arbitrary palette
 """
 
 import sys
-from palette.PalettizeImage import *
+from palette import PalettizeImage
 
 
 if __name__ == '__main__':
-	sys.argv
-	argv = sys.argv[:]
+	argv = sys.argv.copy()
 
 	im_too_lazy_to_use_terminal = False
 	if im_too_lazy_to_use_terminal and len(argv)<=1:
@@ -18,7 +17,7 @@ if __name__ == '__main__':
 			"--demo",			"False", #Generate demo images
 			"--input", 			"./demoImages/LPlumocrista.png",
 			"--palette", 		"./palettes/pal256.png",
-			"--alpha-count", 	"256",	#How many alpha levels
+			"--alpha-count", 	"256",	#How many alpha levels, 0=keep original
 			"--dither", 		"blue",	#Dither type
 			"--max-error", 	"0.0",	#Higher will allow farther colors to replace unique colors. Preserves detail
 			"--merge-radius", "0.0",	#Quantize before palettizing. 0.05 to 0.2 is good value for high depth images

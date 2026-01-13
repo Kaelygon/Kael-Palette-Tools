@@ -44,15 +44,15 @@ Options:
 -h, --help          (None ) show this help message and exit
 -i, --input         (str  ) Path to input .png
 -p, --palette       (str  ) Path to palette .png
--o, --output        (str  ) Path to output .png
+-o, --output        (str  ) Path to output .png. Empty string "" creates new file in same dir as input with p_ prefix
 
--a, --alpha-count   (int  ) How many alpha levels
+-a, --alpha-count   (int  ) How many alpha levels. 0 keeps original alpha
 -e, --max-error     (float) Higher will allow farther colros to replace unique colors. Preserves detail but causes banding at high levels. 1.0-2.0 is good for pixel art.
 -mr, --merge-radius (float) Quantize before palettizing. Reduces unique colors, 0.01 to 0.2 are good values for high depth images.
 
--d, --dither        (str  ) Dither type. Options: none, bayer, steinberg
+-d, --dither        (str  ) Dither type. Options: none, bayer, blue, steinberg
 -ms, --mask-size    (int  ) Dither mask tile size for dither=(bayer, blue) 
--dw, --mask-weight  (float) Dither strength for dither=(none, bayer). dither = 0.0 none, 1.0 normal, 2.0 more
+-dw, --mask-weight  (float) Dither strength for dither=(steinberg, bayer, blue). dither = 0.0 none, 1.0 normal, 2.0 more
 
 -S,  --stats		  (bool ) Print palettization error
 ```

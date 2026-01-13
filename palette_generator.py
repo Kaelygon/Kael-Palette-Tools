@@ -7,10 +7,7 @@
 import numpy as np
 import os
 
-from palette.PalettePreset import *
-from palette.PointList import *
-from palette.PaletteGenerator import *
-from palette.PointListStats import *
+from palette import (PalettePreset, PointList, PaletteGenerator, PointListStats )
 
 def run_PaletteGenerator(preset):
 	palette_list = PointList("oklab", preset=preset)

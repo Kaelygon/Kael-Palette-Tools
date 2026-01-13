@@ -7,13 +7,15 @@ Some examples of good values
 
 import os
 import sys
+import numpy as np
+from PIL import ImageDraw, ImageFont, Image
+
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from palette.PalettizeImage import *
+from palette import PalettizeImage, OkImage
 
-from PIL import ImageDraw, ImageFont
 
 def addImgHeader(in_img, metadata, header_w):
 	w, h = in_img.size
@@ -35,12 +37,12 @@ def generateExample(_input, _palette):
 	concat_output = output_path + "/" + "dither_variants.png"
 
 	variant_fname = []
-	method_list = ConvertPreset.DITHER_METHOD_KEYS
+	method_list = OkImage.Preset.DITHER_METHOD
 	for method in method_list:
 		variant_fname.append(output_path+"/"+"variant_"+method+".png")
 
 	preset_list = [
-		ConvertPreset(
+		OkImage.Preset(
 			image				= _input,
 			palette			= _palette,
 			output			= variant_fname[0],
@@ -49,7 +51,7 @@ def generateExample(_input, _palette):
 			merge_radius	= 0.05,
 			dither			= method_list[0],
 		),
-		ConvertPreset(
+		OkImage.Preset(
 			image				= _input,
 			palette			= _palette,
 			output			= variant_fname[1],
@@ -58,14 +60,14 @@ def generateExample(_input, _palette):
 			mask_size		= 16,
 			mask_weight		= 2.0,
 		),
-		ConvertPreset(
+		OkImage.Preset(
 			image				= _input,
 			palette			= _palette,
 			output			= variant_fname[2],
 			alpha_count		= 1,
 			dither			= method_list[2],
 		),
-		ConvertPreset(
+		OkImage.Preset(
 			image				= _input,
 			palette			= _palette,
 			output			= variant_fname[3],

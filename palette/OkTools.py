@@ -1,7 +1,9 @@
 #OkTools.py
-import numpy as np
+"""Namespace for misc tools used by palette"""
 
-from palette.OkLab import *
+import os
+import numpy as np
+from .OkLab import OkLab
 
 #Manipulate arrays of colors
 class OkTools:
@@ -37,6 +39,7 @@ class OkTools:
 		return norm, np.squeeze(l, axis=-1)
 
 	# vec_b -> vec_a : fac(0 -> 1)
+	@staticmethod
 	def vec3Lerp(vec_a, vec_b, fac):
 		return vec_a * (1.0-fac) + vec_b * fac
 
@@ -106,6 +109,16 @@ class OkTools:
 		)
 		return is_gray
 
+	@staticmethod
+	def quantize(vals, step_count: int):
+		if (step_count is None) or (step_count < 1):
+			return vals #no quant
+		elif step_count == 1:
+			return np.ones_like(vals) #default 1 when single step
+		step_count = step_count-1 #exclude end point
+		step_size = 1.0/step_count
+		new_vals = np.floor((vals + step_size/2.0)/step_size) * step_size
+		return new_vals
 
 	### Misc tools ###
 
@@ -120,3 +133,43 @@ class OkTools:
 	@staticmethod
 	def approxOkGap(point_count: int):
 		return (OkTools.OKLAB_GAMUT_VOLUME/max(1,point_count))**(1.0/3.0)
+
+	@staticmethod
+	def validateFileList(file_list: list[[str,str]]):
+		preset_success = True
+		for file, access_flag in file_list:
+
+			if (file is None) or (file==''):
+				print("Undefined file")
+				preset_success = False
+				continue
+
+			#directory
+			base_dir = os.path.dirname(file)
+			base_dir = "./" if base_dir=='' else base_dir
+			if not os.path.isdir(base_dir):
+				print("Directory doesn't exist " + base_dir)
+				preset_success = False
+				continue
+			if not os.access(base_dir, access_flag):
+				print("Can't access directory "+base_dir)
+				preset_success = False
+				continue
+
+			#file
+			if (access_flag == os.R_OK):
+				if not os.path.exists(file):
+					print("File doesn't exist "+file)
+					preset_success = False
+			else:
+				if os.path.exists(file):
+					#writable file exists
+					if not os.access(file, access_flag):
+						print("Can't access file "+file)
+						preset_success = False
+				else:
+					#writable doesn't exists
+					if not os.access(base_dir, access_flag):
+						print("Can't create file "+file)
+						preset_success = False
+		return preset_success

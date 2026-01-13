@@ -3,10 +3,14 @@ from dataclasses import dataclass, field
 import numpy as np
 import os.path
 
+from .OkTools import OkTools
+
 ### Palette generator ###
 @dataclass
 class PalettePreset:
 	"""Preset for PaletteGenerator"""
+	VALID_METHODS: list[str] = field(default_factory=lambda: ["precolor", "gray", "poisson", "grid", "random", "zero"]) 
+	DEFAULT_METHOD: list[str] = field(default_factory=lambda: ["gray", "poisson","grid"]) 
 
 	#File i/o
 	palette_output: str = "palette.png" # (mandatory) full output file path
@@ -44,9 +48,9 @@ class PalettePreset:
 
 	logging: bool = False #Disables stats and some printing
 
+	valid: bool = False
+
 	def __post_init__(self):
-		self.VALID_METHODS: list[str] = ["precolor", "gray", "poisson", "grid", "random", "zero"]
-		self.DEFAULT_METHOD: list[str] = ["gray", "poisson","grid"]
 
 		#var sanity checks
 		self.reserve_transparent = max(0, min(1, self.reserve_transparent) )
@@ -71,42 +75,12 @@ class PalettePreset:
 			self.sample_method = self.DEFAULT_METHOD
 			print("No valid sample_method. Defaulting to ", str(self.DEFAULT_METHOD))
 
-		#input validity check
-		file_attributes = ["palette_output", "histogram_file", "img_pre_colors", "img_fixed_mask"]
-		is_input = [0, 0, 1, 1]
-		for i,attribute in enumerate(file_attributes):
-			file = getattr(self, attribute)
-			if file == None:
-				continue
-
-			base_dir = os.path.dirname(file)
-			if base_dir == '':
-				base_dir = "./"
-
-			preset_fail = 0
-
-			if not os.path.isdir(base_dir):
-				#test if path exists
-				print("Directory "+base_dir+" doesn't exist.")
-				preset_fail = 1
-
-			if is_input[i]:
-				#test if exists and can be read
-				if not os.path.exists(file) or not os.access(file, os.R_OK):
-					print("File doesn't exist "+file)
-					preset_fail = 1
-
-			else:
-				if os.path.exists(file):
-					#test if can overwrite
-					if not os.access(file, os.W_OK):
-						print("Can't access file "+file)
-						preset_fail = 1
-				else:
-					#test if can create
-					if not os.access(base_dir, os.W_OK):
-							print("Can't create file " + file)
-							preset_fail = 1
-
-			if preset_fail:
-				setattr(self, attribute, None)
+		#file validity check
+		preset_files = [
+			["palette_output", os.W_OK],
+			["histogram_file", os.W_OK],
+			["img_pre_colors", os.R_OK],
+			["img_fixed_mask", os.R_OK],
+		]
+		
+		self.valid = OkTools.validateFileList(preset_files)

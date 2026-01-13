@@ -3,8 +3,8 @@ from dataclasses import dataclass, fields
 import numpy as np
 from scipy.spatial import cKDTree
 
-from palette.OkTools import *
-from palette.PointList import *
+from .OkTools import OkTools
+from .PointList import PointList
 
 
 class ParticleType:

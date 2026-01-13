@@ -2,10 +2,10 @@
 import numpy as np
 from dataclasses import dataclass, field
 
-from palette.PointList import *
-from palette.ParticleSim import *
-from palette.OkTools import *
-from palette.PointSampler import *
+from .PointList import PointList
+from .ParticleSim import ParticleSim
+from .OkTools import OkTools
+from .PointSampler import PointSampler
 
 
 

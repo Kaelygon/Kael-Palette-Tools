@@ -1,5 +1,5 @@
 import numpy as np
-from palette.ArrayRandom import *
+from .ArrayRandom import ArrayRandom
 
 """
 OrderedDither. namespace matrix creation tools
@@ -32,7 +32,7 @@ class OrderedDither:
 		return arr_ranks
 
 	@staticmethod
-	def _fallbackMatrix():
+	def fallbackMatrix():
 		amogus = (343150 >> np.arange(25) & 1).reshape(5,5) - 0.5 #343150x10 = 5x5 amogus in binary
 		m = np.stack([amogus]*4, axis=2)
 		return m[:,:,0], m[:,:,1], m[:,:,2], m[:,:,3]
@@ -43,7 +43,7 @@ class OrderedDither:
 	def bayerOklab(size):
 		depth=4
 		if size<1:
-			return OrderedDither._fallbackMatrix()
+			return OrderedDither.fallbackMatrix()
 
 		x, y, z = np.meshgrid(np.arange(size), np.arange(size), np.arange(size), indexing='ij')
 		b_m = np.zeros_like(x)
@@ -72,12 +72,14 @@ class OrderedDither:
 	#Blue noise
 	#lerp (white noise) -> (1 - avg neighborhood)
 	#weight=0 is white noise, weight=1 is neighborhood avg
-	def blueNoiseOklab(height, width, weight=0.64):
+	def blueNoiseOklab(height, width=None, weight=0.64, noise_seed=0):
 		channel_count = 4
+		if width is None:
+			width=height
 		if height<1 or width<1:
-			return OrderedDither._fallbackMatrix()
+			return OrderedDither.fallbackMatrix()
 
-		rand = ArrayRandom(0)
+		rand = ArrayRandom(noise_seed)
 		pixels = rand.random((height,width,channel_count))
 
 		#pixels relative to current

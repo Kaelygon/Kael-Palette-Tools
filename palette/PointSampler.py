@@ -3,10 +3,10 @@ import numpy as np
 from scipy.spatial import cKDTree
 from PIL import Image
 
-from palette.PointList import *
-from palette.OkLab import *
-from palette.OkTools import *
-from palette.PalettePreset import *
+from .PointList import PointList
+from .OkLab import OkLab
+from .OkTools import OkTools
+from .PalettePreset import PalettePreset
 
 #Generate PointList.points within OKLab gamut and colorspace
 class PointSampler:

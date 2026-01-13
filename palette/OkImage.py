@@ -1,53 +1,26 @@
 import numpy as np
 from PIL import Image
 from dataclasses import dataclass, field
-from scipy.spatial import cKDTree as KDTree
+from scipy.spatial import cKDTree
 from numba import njit
 
 import os.path
 
-from palette.OrderedDither import *
-from palette.OkLab import *
-from palette.OkTools import *
+from .OrderedDither import OrderedDither
+from .OkLab import OkLab
+from .OkTools import OkTools
 
-@dataclass
-class ConvertPreset:
-	DITHER_METHOD = {
-		"none" : 0,
-		"bayer" : 1,
-		"steinberg" : 2,
-		"blue" : 3,
-		"0" : 0,
-		"1" : 1,
-		"2" : 2,
-		"3" : 3,
-	}
-	DITHER_METHOD_KEYS = [
-		"none",
-		"bayer",
-		"steinberg",
-		"blue",
-	]
 
-	image: str 				= None
-	palette: str 			= None
-	output: str				= None
-	alpha_count: int 		= 1
-	max_error: float 		= 0.0
-	merge_radius: float 	= 0.0
-	dither: int 			= 0
-	mask_size: int 		= 16
-	mask_weight: float 	= 1.0
-	print_stats: bool		= False
 
-#### Image conversion ###
-
+#njit must be floating function
 @njit(fastmath=True)
-def OkImage_njitFloydSteinberg(pixels:np.ndarray, pal_colors:np.ndarray, alpha_count:int, width:int, height:int, margin:float):
-	i: int=-1
+def _OkImage_njitFloydSteinberg(pixels:np.ndarray, pal_colors:np.ndarray, alpha_count:int, width:int, height:int, mask_weight: float, margin:float):
+	i = -1
 	margin_sq: float = margin*margin
 	pal_len: int = pal_colors.shape[0]
-	alpha_step: float = 1.0/alpha_count
+	alpha_count_no_end = alpha_count - 1 #exclude end point
+	alpha_count_no_end = 1 if alpha_count_no_end<1 else alpha_count_no_end #max(1,)
+	alpha_step: float = 1.0/alpha_count_no_end
 	for y in range(height):
 		for x in range(width):
 			i+=1
@@ -66,13 +39,17 @@ def OkImage_njitFloydSteinberg(pixels:np.ndarray, pal_colors:np.ndarray, alpha_c
 						break
 
 			#quant_error = (old_pixels - new_pixels)/16.0
-			quant_error_l = (pixels[i, 0] - pal_colors[best_idx, 0])/16.0
-			quant_error_a = (pixels[i, 1] - pal_colors[best_idx, 1])/16.0
-			quant_error_b = (pixels[i, 2] - pal_colors[best_idx, 2])/16.0
+			quant_error_l = (pixels[i, 0] - pal_colors[best_idx, 0])/16.0 * mask_weight
+			quant_error_a = (pixels[i, 1] - pal_colors[best_idx, 1])/16.0 * mask_weight
+			quant_error_b = (pixels[i, 2] - pal_colors[best_idx, 2])/16.0 * mask_weight
 
 			#int trunacte rounding trick
-			new_alpha = float( int((pixels[i, 3]+alpha_step/2.0)/alpha_step) )*alpha_step
-			alpha_error = (pixels[i, 3] - new_alpha)/16.0
+			new_alpha = 1.0
+			if alpha_count>1:
+				new_alpha = float( int((pixels[i, 3]+alpha_step/2.0)/alpha_step) )*alpha_step
+			elif alpha_count==0:
+				new_alpha = pixels[i, 3]
+			alpha_error = (pixels[i, 3] - new_alpha)/16.0 * mask_weight
 
 			#pixels = new_pixels
 			pixels[i, 0] = pal_colors[best_idx, 0]
@@ -108,23 +85,209 @@ def OkImage_njitFloydSteinberg(pixels:np.ndarray, pal_colors:np.ndarray, alpha_c
 	return pixels
 
 
-#striped list. item = (color[i],alpha[i],area[i])
+
+### OkImage Sub-classes ###
 @dataclass
-class UniqueList:
+class OkImage_Preset:
+	DITHER_METHOD = ("none", "bayer", "steinberg", "blue")
+
+	image: str 				= None
+	palette: str 			= None
+	output: str				= None
+	alpha_count: int 		= 0 		#0 = keep original
+	max_error: float 		= 0.0
+	merge_radius: float 	= 0.0
+	dither: str 			= "none"
+	mask_size: int 		= 16
+	mask_weight: float 	= 1.0
+	print_stats: bool		= False
+
+	valid: bool = field(default=False, init=False)
+
+	def __post_init__(self):
+		if self.image is None:
+			print("Invalid OkImage.Preset.image")
+			return
+		if self.palette is None:
+			print("Invalid OkImage.Preset.palette")
+			return
+		if self.output is None or self.output == "none":
+			self.output = ""
+
+		#assign dither
+		self.dither = str(self.dither).lower()
+		if self.dither not in self.DITHER_METHOD:
+			print("Preset fail: Invalid Preset.dither " + str(self.dither))
+			return
+
+		#assign output
+		image_path = os.path.dirname(self.image)
+		image_path = "./" if image_path=="" else image_path
+		input_basename = os.path.basename(self.image)
+
+		output_path = os.path.dirname(self.output)
+		output_basename = os.path.basename(self.output)
+
+		if self.output == "./":
+			#current dir
+			self.output = "./" + "p_" + os.path.basename(self.image)
+
+		elif self.output=='':
+			#same dir as source with p_ prefix
+			self.output = os.path.join(image_path, "p_"+ input_basename)
+
+		elif output_basename == '':
+			#Only output folder provided
+			self.output = os.path.join(output_path, "p_"+ input_basename)
+
+		#preset validity check
+		#print info about all invalid paths
+		preset_files = [
+			[self.image, os.R_OK ],
+			[self.palette, os.R_OK ], 
+			[self.output, os.W_OK ],
+		]
+		
+		self.valid = OkTools.validateFileList(preset_files)
+
+#striped list. item = (color[i],area[i])
+@dataclass
+class OkImage_UniqueList:
 	color: np.ndarray #uniques only
-	alpha: np.ndarray
 	area: np.ndarray
 
 	unique_idxs: np.ndarray
 	original_idxs: np.ndarray #colors_with_dupes = color[original_idxs]
-	tree: KDTree = None
+	tree: cKDTree = None
+
+	def __len__(self):
+		return len(self.color)
 
 	def getUniqueTree(self):
 		if self.tree is None:
-			self.tree = KDTree(self.color)
+			self.tree = cKDTree(self.color)
 		return self.tree
 
+
+### OkImage.Dither ###
+class OkImage_Dither:
+	"""
+		Mutates OkImage.pixels_output using OkImage.preset
+	"""
+
+	@staticmethod
+	def _isValidInput(source_img, palette_img, preset):
+		if source_img is None:
+			print("Invalid source_img")
+			return False
+		if palette_img is None:
+			print("Invalid palette_img")
+			return False
+		if (preset is None) or (not preset.valid):
+			print("Invalid preset")
+			return False
+		return True
+
+	@staticmethod
+	def ditherNone(source_img, palette_img, preset):
+		if not OkImage.Dither._isValidInput(source_img, palette_img, preset):
+			return
+
+		pal_list = palette_img.unique_list
+
+		pal_tree = pal_list.getUniqueTree()
+		_, idxs = pal_tree.query(source_img.pixels_output[:,:3], k=1, workers=-1)
+		source_img.pixels_output[:,:3] = pal_list.color[:,:3][idxs]
+
+
+	#https://bisqwit.iki.fi/story/howto/dither/jy/
+	@staticmethod
+	def ditherOrdered(source_img, palette_img, preset):
+		if not OkImage.Dither._isValidInput(source_img, palette_img, preset):
+			return
+
+		pal_list = palette_img.unique_list
+		pixels = source_img.pixels_output #lab+alpha
+		pal_tree = pal_list.getUniqueTree()
+
+		#Channel gaps of nearest 2 palette colors to current pixel
+		pal_dists, idxs = pal_tree.query(pixels[:,:3], k=2, workers=-1)
+		palette_gaps = np.abs(pal_list.color[idxs[:,1]] - pal_list.color[idxs[:,0]]) #lab
+
+		#preset.mask_weight rules dither
+		# 0.0 to 1.0 : 0.0 -> palette_gaps
+		# 1.0 to 2.0 : palette_gaps -> palette_gaps_norm
+		max_pal_dist = np.max(pal_dists[:,1])
+		gater = pal_dists[:,1]/(max_pal_dist+1e-12)
+		gater = gater[:,None]*[1,1,1]
+
+		if preset.mask_weight < 1.0:
+			palette_gaps = OkTools.vec3Lerp(np.zeros_like(palette_gaps), palette_gaps, gater)
+		else:
+			palette_gaps_length = OkTools.vec3Length(palette_gaps,axis=1)[:,None]*[1,1,1]
+			palette_gaps = OkTools.vec3Lerp(palette_gaps, palette_gaps_length, gater)
+
+		#Create dither mask
+		if preset.dither == "bayer":
+			thresholds_stack = OrderedDither.bayerOklab(preset.mask_size)
+		elif preset.dither == "blue":
+			thresholds_stack = OrderedDither.blueNoiseOklab(preset.mask_size)
+		else:
+			thresholds_stack = OrderedDither.fallbackMatrix()
+		m_l, m_a, m_b, m_o = thresholds_stack
+
+		#Tile mask
+		y_idxs, x_idxs = np.divmod(np.arange(source_img.height*source_img.width), source_img.width)
+
+		t_y_idxs = y_idxs % m_l.shape[0]
+		t_x_idxs = x_idxs % m_l.shape[1]
+		t_l = m_l[t_y_idxs, t_x_idxs]
+		t_a = m_a[t_y_idxs, t_x_idxs]
+		t_b = m_b[t_y_idxs, t_x_idxs]
+		t_o = m_o[t_y_idxs, t_x_idxs]
+
+		#thresholds lab
+		thresholds_lab = np.stack((t_l, t_a, t_b), axis=1)
+		pixels[:,:3]+= thresholds_lab * palette_gaps
+
+		_, idxs = pal_tree.query(pixels[:,:3], k=1, workers=-1)
+		pixels[:,:3] = pal_list.color[idxs]
+
+		#thresholds alpha
+		if preset.alpha_count:
+			alpha_gaps = 1.0/np.float32(max(1, preset.alpha_count-1)) #-1 to exclude end point
+			pixels[:, 3]+= t_o * alpha_gaps * preset.mask_weight
+			pixels[:, 3] = OkTools.quantize(pixels[:, 3], preset.alpha_count)
+		return pixels
+
+
+	@staticmethod
+	def ditherFloydSteinberg(source_img, palette_img, preset):
+		if not OkImage.Dither._isValidInput(source_img, palette_img, preset):
+			return
+
+		source_img.pixels_output = _OkImage_njitFloydSteinberg(
+			source_img.pixels_output, 
+			palette_img.unique_list.color, 
+			preset.alpha_count, 
+			source_img.width, 
+			source_img.height, 
+			min(1.0,preset.mask_weight), #prevent runaway
+			OkTools.OKLAB_8BIT_MARGIN
+		)
+
+
+
+
+### OkImage main class ###
+
 class OkImage:
+	#Namespacing
+	Preset = OkImage_Preset
+	UniqueList = OkImage_UniqueList
+	Dither = OkImage_Dither
+
+	#class vars
 	pixels = None #don't mutate after init
 	pixels_output = None #copy of pixels that can be modified
 
@@ -134,36 +297,8 @@ class OkImage:
 	unique_list = None
 
 	#private
-	def __init__(self, input_path):
-		self.imgToOkPixels(input_path)
-
-	def _quantize(self, vals, step_count: int):
-		step_count = int(max(1,step_count))
-		return np.round(vals*step_count)/step_count
-
-	def _applyDitherThresholds(self, pixels, thresholds_lab, palette_gaps, pal_list: UniqueList, alpha_count, alpha_weight):
-		m_l, m_a, m_b, m_o = thresholds_lab
-		y_idxs, x_idxs = np.divmod(np.arange(self.height*self.width), self.width)
-
-		t_y_idxs = y_idxs % m_l.shape[0]
-		t_x_idxs = x_idxs % m_l.shape[1]
-		t_l = m_l[t_y_idxs, t_x_idxs]
-		t_a = m_a[t_y_idxs, t_x_idxs]
-		t_b = m_b[t_y_idxs, t_x_idxs]
-		t_o = m_o[t_y_idxs, t_x_idxs]
-
-		thresholds_stack = np.stack((t_l, t_a, t_b), axis=1)
-		pixels[:,:3]+= thresholds_stack * palette_gaps
-
-		pal_tree = pal_list.getUniqueTree()
-		_, idxs = pal_tree.query(pixels[:,:3], k=1, workers=-1)
-		pixels[:,:3] = pal_list.color[idxs]
-
-		if alpha_count:
-			pixels[:, 3]+= t_o * alpha_weight/np.float32(alpha_count)
-			pixels[:, 3] = self._quantize(pixels[:, 3], alpha_count)
-		return pixels
-
+	def __init__(self, image_path):
+		self.imgToOkPixels(image_path)
 
 	#public
 	def imgToOkPixels(self, img_path: str):
@@ -172,10 +307,10 @@ class OkImage:
 		col_list = col_list.reshape(-1, 4) / 255.0
 		col_list[:,:3] = OkLab.srgbToOklab(col_list[:,:3])
 		ok_steps = int(np.ceil(1.0/OkTools.OKLAB_8BIT_MARGIN))
-		col_list[:,:3] = self._quantize(col_list[:,:3], ok_steps)
+		col_list[:,:3] = OkTools.quantize(col_list[:,:3], ok_steps)
 
 		self.pixels = col_list
-		self.pixels_output = self.pixels.copy()
+		self.pixels_output = np.ascontiguousarray(self.pixels.copy())
 		self.width, self.height = in_img.size
 
 	def saveImage(self, output_path: str):
@@ -187,19 +322,24 @@ class OkImage:
 		img = Image.fromarray(rgba, "RGBA")
 		img.save(output_path, compress_level=1)
 
+
+	#### palettize methods ###
+	def applyPalette(self, unique_mapping):
+		self.pixels_output[:,:3] = unique_mapping.color[unique_mapping.original_idxs]
+
 	def quantizeAxes(self, step_count: int):
-		quant_lab = self._quantize(self.pixels_output[:,:3], step_count)
+		quant_lab = OkTools.quantize(self.pixels_output[:,:3], step_count)
 		self.pixels_output[:,:3] = quant_lab
 		
 	def quantizeAlpha(self, alpha_count: int):
-		if alpha_count == None:
+		if alpha_count == None or alpha_count <= 0:
 			return
 
 		alpha = self.pixels_output[:,3]
-		if alpha_count == 0:
-			alpha = np.zeros(len(alpha)) + 1.0
+		if alpha_count <= 1:
+			alpha[:] = 1.0
 		else:
-			alpha = self._quantize(alpha,alpha_count)
+			alpha = OkTools.quantize(alpha,alpha_count)
 		self.pixels_output[:,3] = alpha
 
 	def createUniqueList(self):
@@ -210,94 +350,23 @@ class OkImage:
 		unique_view, unique_idxs, original_idxs = np.unique(pixels_view, return_index=True, return_inverse=True)
 		unique_colors = pixels[unique_idxs,:3]
 
-		opaque = pixels[:, 3] / 1.0
+		opaque = pixels[:, 3]
 		area = np.bincount(
 			original_idxs,
 			weights=opaque,
 			minlength=len(unique_colors)
 		)
 
-		self.unique_list = UniqueList(
+		self.unique_list = self.UniqueList(
 			unique_colors,
-			pixels[unique_idxs,3],
 			area,
 			unique_idxs,
 			original_idxs
 		)
 		self.unique_list.color = np.ascontiguousarray(self.unique_list.color, dtype=np.float32)
 
-	#### palettize methods ###
-	def applyPalette(self, unique_palettized):
-		self.pixels_output[:,:3] = unique_palettized[self.unique_list.original_idxs]
 
-	def ditherNone(self, palette_img):
-		pal_list = palette_img.unique_list
-		pixels = self.pixels_output[:,:3]
-
-		pal_tree = pal_list.getUniqueTree()
-		_, idxs = pal_tree.query(pixels, k=1, workers=-1)
-		self.pixels_output[:,:3] = pal_list.color[:,:3][idxs]
-
-	#https://bisqwit.iki.fi/story/howto/dither/jy/
-	def ditherOrdered(self, palette_img, matrix_size=16, dither_weight=1.0, alpha_count=1):
-		pal_list = palette_img.unique_list
-		pixels = self.pixels_output #lab+alpha
-		pal_tree = pal_list.getUniqueTree()
-
-		#Channel gaps of nearest 2 palette colors to current pixel
-		pal_dists, idxs = pal_tree.query(pixels[:,:3], k=2, workers=-1)
-		palette_gaps = np.abs(pal_list.color[idxs[:,1]] - pal_list.color[idxs[:,0]]) #lab
-
-		#0.0 = no dither, 1.0 = normal dither, 2.0 more dither
-		# 1.0 to 2.0 : palette_gaps -> palette_gaps_norm
-		max_pal_dist = np.max(pal_dists[:,0])
-		gater = pal_dists[:,0]/max_pal_dist
-		gater = np.maximum(0.0, gater * (dither_weight - 1.0))
-
-		palette_gaps_length = OkTools.vec3Length(palette_gaps,axis=1)[:,None]*[1,1,1]
-		palette_gaps = OkTools.vec3Lerp(palette_gaps, palette_gaps_length, gater[:,None]*[1,1,1])
-
-		alpha_weight=1.0
-		if dither_weight < 1.0:
-			# 0.0 to 1.0, removes dither
-			palette_gaps*=dither_weight
-			alpha_weight =dither_weight
-
-		thresholds_lab = OrderedDither.bayerOklab(matrix_size) #lab+alpha
-
-		self.pixels_output = self._applyDitherThresholds(pixels, thresholds_lab, palette_gaps, pal_list, alpha_count, alpha_weight)
-
-	def ditherBlue(self, palette_img, matrix_size=16, dither_weight=1.0, alpha_count=1):
-		pal_list = palette_img.unique_list
-		pixels = self.pixels_output
-		pal_tree = pal_list.getUniqueTree()
-
-		pal_dists, idxs = pal_tree.query(pixels[:,:3], k=2, workers=-1)
-		palette_gaps = np.abs(pal_list.color[idxs[:,1]] - pal_list.color[idxs[:,0]])
-
-		blue_thresholds = OrderedDither.blueNoiseOklab(matrix_size,matrix_size)
-		blue_thresholds = np.array(blue_thresholds) * dither_weight
-
-		alpha_weight=1.0
-		if dither_weight < 1.0:
-			alpha_weight = dither_weight
-
-		self.pixels_output = self._applyDitherThresholds(pixels, blue_thresholds, palette_gaps, pal_list, alpha_count, alpha_weight)
-
-
-	def ditherFloydSteinberg(self, palette_img, alpha_count):
-		pixels = self.pixels_output
-		pal_colors = palette_img.unique_list.color
-
-		self.pixels_output = OkImage_njitFloydSteinberg(
-			pixels, 
-			pal_colors, 
-			max(1,alpha_count), 
-			self.width, 
-			self.height, 
-			OkTools.OKLAB_8BIT_MARGIN
-		)
-
+	#calc and print change between self.pixels_output and self.pixels
 	def printImgError(self):
 		quant_delta = self.pixels_output - self.pixels
 		dl = quant_delta[:,0]
@@ -331,3 +400,4 @@ class OkImage:
 		)
 		print("Alpha bias: " + str(round(alpha_bias,4)) + ", " )
 		print("Total bias: " + str(round(total_bias,8)))
+

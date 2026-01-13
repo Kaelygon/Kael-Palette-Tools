@@ -109,16 +109,7 @@ class OkTools:
 		)
 		return is_gray
 
-	@staticmethod
-	def quantize(vals, step_count: int):
-		if (step_count is None) or (step_count < 1):
-			return vals #no quant
-		elif step_count == 1:
-			return np.ones_like(vals) #default 1 when single step
-		step_count = step_count-1 #exclude end point
-		step_size = 1.0/step_count
-		new_vals = np.floor((vals + step_size/2.0)/step_size) * step_size
-		return new_vals
+
 
 	### Misc tools ###
 

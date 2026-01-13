@@ -372,6 +372,11 @@ class OkImage:
 
 	#public methods
 
+	def updateUniqueList(self):
+		#Manual explicit initialization
+		self._unique_list = OkImage.UniqueList()
+		self._unique_list.update(self.pixels)
+
 	## I/O
 	
 	def copy(self):

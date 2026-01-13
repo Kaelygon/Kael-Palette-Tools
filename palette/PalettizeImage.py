@@ -213,6 +213,7 @@ class PalettizeImage:
 		palette_ok = OkImage()
 		palette_ok.loadImage(preset.palette)
 		OkImage.Filter.quantizeAxes(palette_ok, step_count=1, axes=[3]) #remove palette alpha
+		palette_ok.updateUniqueList()
 
 		pal_length = len(palette_ok.unique_list.color)
 		if pal_length < 2:
@@ -235,6 +236,7 @@ class PalettizeImage:
 		elif preset.dither == "none":
 			if preset.max_error:
 				#choose closest within max_error, weighted by area
+				image_ok.updateUniqueList() #only place where source image uniques are calculated
 				unique_mapping = PalettizeImage._createWeightedPalette(image_ok.unique_list, palette_ok.unique_list, preset.max_error)
 				OkImage.Filter.applyPalette(image_ok, unique_mapping)
 			else:

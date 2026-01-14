@@ -1,31 +1,30 @@
-#PaletteGenerator.py
 import numpy as np
-from dataclasses import dataclass, field
 
 from .PointList import PointList
 from .ParticleSim import ParticleSim
 from .OkTools import OkTools
 from .PointSampler import PointSampler
+from .ArrayRandom import ArrayRandom
 
 
 
+### Palette generator ###
 
-class PaletteGenerator:
-	"""
-		Generate palette where the colors are perceptually evenly spaced out in OKLab colorspace
-	"""
+class PaletteGen:
 
-	### Concat generated colors to palette_list.points ###
 	@staticmethod
-	def populatePointList(palette_list : PointList):
-
-		preset = palette_list.preset
+	def _populatePointList(palette_list: PointList, preset):
+		"""
+			Generate palette where the colors are perceptually evenly spaced out in OKLab colorspace
+		"""
+		gen_rand = ArrayRandom(preset.seed)
 
 		cell_size = OkTools.approxOkGap(preset.max_colors)
 		sample_point_radius = cell_size * preset.sample_radius
 		relax_point_radius = cell_size * preset.relax_radius
 
 		if preset.logging:
+			print("Using seed ", gen_rand._seed)
 			print("Using sample_point_radius "+str(round(sample_point_radius,4)))
 			print("Using relax_point_radius "+str(round(relax_point_radius,4)))
 
@@ -46,13 +45,14 @@ class PaletteGenerator:
 			#poisson points
 			elif method == "poisson":
 				new_points = PointSampler.poissonDisk(
-					point_list=palette_list,
-					point_count=empty_point_count,
-					radius=sample_point_radius,
+					point_list = palette_list,
+					point_count = empty_point_count,
+					radius = sample_point_radius,
 					overlap = 0.01,
 					generate_edges = True,
 					kissing_number = 48,
 					sample_attempts = preset.sample_attempts,
+					rand = gen_rand,
 					logging = preset.logging
 				)
 			#random points
@@ -60,9 +60,10 @@ class PaletteGenerator:
 				new_points = PointSampler.randomReject(
 					point_list = palette_list,
 					point_count = empty_point_count,
-					radius=sample_point_radius,
+					radius = sample_point_radius,
 					overlap = 0.49,
 					sample_attempts = preset.sample_attempts,
+					rand = gen_rand,
 					logging = preset.logging
 				)
 			#grid points
@@ -70,10 +71,11 @@ class PaletteGenerator:
 				new_points = PointSampler.gridReject(
 					point_list = palette_list,
 					point_count = empty_point_count,
-					radius=sample_point_radius,
+					radius = sample_point_radius,
 					overlap = 0.3,
 					kissing_number = 48,
 					sample_attempts = preset.sample_attempts,
+					rand = gen_rand,
 					logging = preset.logging
 				)
 			#Handy for testing edge cases
@@ -89,17 +91,28 @@ class PaletteGenerator:
 		#truncate palette
 		palette_list.points = palette_list.points[:preset.max_colors]
 
-		relax_log_frequency = 64 if preset.logging else 0
 		simulator = ParticleSim()
 		palette_list = simulator.relaxCloud(
 			point_list = palette_list,
 			iterations=preset.relax_count,
+			rand = gen_rand,
 			approx_radius = relax_point_radius,
 			record_frame_path = preset.histogram_file,
-			log_frequency = relax_log_frequency
-   	)
+			log_frequency = preset.logging
+		)
 
 		return palette_list
 
 
+	@staticmethod
+	def usePreset(preset):
+		palette_list = PointList("oklab")
+		palette_list = PaletteGen._populatePointList(palette_list, preset)
 
+		palette_list = PointList.Color.applyLimits(palette_list, preset)
+		palette_list = PointList.Color.sort(palette_list, preset)
+		output_image = palette_list.saveImage(preset)
+
+		if preset.logging:
+			PointList.Stats.gaps(palette_list,precision=4)
+			print("Generated "+str(len(palette_list) + preset.reserve_transparent)+" colors to "+ preset.palette_output)

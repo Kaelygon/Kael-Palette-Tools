@@ -1,4 +1,3 @@
-#OkTools.py
 """Namespace for misc tools used by palette"""
 
 import os

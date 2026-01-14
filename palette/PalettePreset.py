@@ -1,14 +1,11 @@
-#PalettePreset.py
-from dataclasses import dataclass, field
-import numpy as np
-import os.path
 
+import os.path
+from dataclasses import dataclass, field
 from .OkTools import OkTools
 
-### Palette generator ###
+
 @dataclass
 class PalettePreset:
-	"""Preset for PaletteGenerator"""
 	VALID_METHODS: list[str] = field(default_factory=lambda: ["precolor", "gray", "poisson", "grid", "random", "zero"]) 
 	DEFAULT_METHOD: list[str] = field(default_factory=lambda: ["gray", "poisson","grid"]) 
 
@@ -22,7 +19,6 @@ class PalettePreset:
 	#"precolor" obtain colors from img_pre_colors, pixels in img_fixed_mask with luminance>128 retain their color
 	#"gray" generate gray_count grayscale colors
 	#"poisson" poisson disk sample
-	#"voids" find and fill voids
 	#"random" random reject, allows 51% sample_radius overlap
 	#"zero" generate points at [0.5,0.0,0.0]
 	sample_method: list[str] = field(default_factory=lambda: ["gray", "poisson", "grid"])
@@ -44,9 +40,9 @@ class PalettePreset:
 	sample_attempts: int = 1024 #After this many sample_attempts per point, sampler method will give up
 	relax_count: int = 1024 #number of relax iteration after point sampling
 	
-	seed: int = None #None = random seed, [0,UINT64_MAX] = set seeded
+	seed: int = None #None = random seed, [0,UINT64_MAX] = set seed
 
-	logging: bool = False #Disables stats and some printing
+	logging: int = 0 #>=1 enables logging. Value sets ParticleSim logging frequency
 
 	valid: bool = False
 
@@ -77,10 +73,15 @@ class PalettePreset:
 
 		#file validity check
 		preset_files = [
-			["palette_output", os.W_OK],
-			["histogram_file", os.W_OK],
-			["img_pre_colors", os.R_OK],
-			["img_fixed_mask", os.R_OK],
+			[self.palette_output, os.W_OK],
 		]
+
+		#Only check files when relevant
+		if self.histogram_file:
+			preset_files.append([self.histogram_file, os.W_OK])
+		if ("precolor" in self.sample_method):
+			preset_files.append([self.img_pre_colors, os.R_OK])
+		if self.img_fixed_mask:
+			preset_files.append([self.img_fixed_mask, os.R_OK])
 		
 		self.valid = OkTools.validateFileList(preset_files)

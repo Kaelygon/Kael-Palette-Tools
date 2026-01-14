@@ -1,4 +1,3 @@
-#ParticleSim.py
 from dataclasses import dataclass, fields
 import numpy as np
 from scipy.spatial import cKDTree
@@ -247,6 +246,7 @@ class ParticleSim:
 		point_list,
 		approx_radius,
 		iterations = 256,
+		rand = None,
 		record_frame_path = None,
 		log_frequency = 64,
 		max_r_change = 0.1, #max change in radius per 1 sim_dt
@@ -273,8 +273,7 @@ class ParticleSim:
 		relax_end_steps = iterations/4
 
 		particles = ParticleType(point_list, approx_radius)
-		rand=point_list.rand
-		if rand != None:
+		if rand is not None:
 			#Add run to run variation
 			particles.createVariance(rand, 0.01)
 
@@ -429,7 +428,7 @@ class ParticleSim:
 				frame = particles.pos.astype(np.float32)
 				particle_frames.append(frame)
 
-			if log_frequency and (tick%log_frequency==0 or tick==iterations-1):
+			if (log_frequency>1) and (tick%log_frequency==0 or tick==iterations-1):
 				total_energy=self.calcTotalEnergy(particles.m, particles.v_mag)
 				out_str = "DT: " + str(round(sim_dt,print_precision)) + " Total energy["+str(round(sim_time_elapsed,print_precision))+"]:"
 				out_str+= " "+str(total_energy)

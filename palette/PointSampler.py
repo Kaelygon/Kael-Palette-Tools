@@ -1,4 +1,3 @@
-#PointSampler.py
 import numpy as np
 from scipy.spatial import cKDTree
 from PIL import Image
@@ -6,7 +5,6 @@ from PIL import Image
 from .PointList import PointList
 from .OkLab import OkLab
 from .OkTools import OkTools
-from .PalettePreset import PalettePreset
 
 #Generate PointList.points within OKLab gamut and colorspace
 class PointSampler:
@@ -106,7 +104,7 @@ class PointSampler:
 
 	#convert preset.img_pre_colors to PointList. Luminance in preset.img_fixed_mask makes the point immovable
 	@staticmethod
-	def precolor(preset: PalettePreset, alpha_threshold:int=0, fixed_mask_threshold:int=128):
+	def precolor(preset, alpha_threshold:int=0, fixed_mask_threshold:int=128):
 		if preset.img_pre_colors == None:
 			print("Warning: preset.img_pre_colors is not set")
 			return PointList("oklab", 0)
@@ -151,13 +149,13 @@ class PointSampler:
 		generate_edges: bool = False,
 		kissing_number: int = 24,
 		sample_attempts: int = 1000,
+		rand=None,
 		logging = False
 	):
 		initial_points = point_list.points["color"]
 		min_dist = radius - radius * overlap
 
 		offset = np.zeros((1,3))
-		rand = point_list.rand
 		if rand:
 			offset = rand.random((1,3))
 		neighbor_offsets = OkTools.sphereNormals(kissing_number, offset) * radius
@@ -220,10 +218,9 @@ class PointSampler:
 		radius: float = None,
 		overlap: float = None, #None skips distance check
 		sample_attempts: int = 1000,
+		rand=None,
 		logging = False
 	):
-		rand = point_list.rand
-
 		batch_size, min_dist = PointSampler._calcBatchSize(point_count, radius, overlap)
 		batch_size = min(100000, batch_size)
 
@@ -280,10 +277,9 @@ class PointSampler:
 		overlap: float = None,
 		kissing_number = 48,
 		sample_attempts: int = 1000,
+		rand=None,
 		logging = False
 	):
-		rand = point_list.rand
-
 		min_dist = radius - radius * overlap
 		grid_density = radius
 		grid_points = PointSampler._createMeshGrid(grid_density)

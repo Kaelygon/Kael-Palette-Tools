@@ -1,56 +1,46 @@
 #!/usr/bin/env python
-#palette_generator.py
 """
 	Generate uniform palette in OKLab gamut
 """
 
-import numpy as np
 import os
-
-from palette import (PalettePreset, PointList, PaletteGenerator, PointListStats )
-
-def run_PaletteGenerator(preset):
-	palette_list = PointList("oklab", preset=preset)
-	palette_list = PaletteGenerator.populatePointList(palette_list)
-
-	palette_list.applyColorLimits()
-	palette_list.sortPalette()
-	palette_list.saveAsImage()
-
-	if preset.logging:
-		PointListStats.printGapStats(palette_list,4)
-		print("Generated "+str(len(palette_list) + preset.reserve_transparent)+" colors to "+ preset.palette_output)
+from palette import PaletteGen, PalettePreset
 
 
 if __name__ == '__main__':
-	output_path = "./output/"
+	output_path = "output"
 	if not os.path.exists(output_path):
 		os.makedirs(output_path)
 
 	preset_pal64 = PalettePreset(
 			sample_method = ["gray", "poisson", "grid", "random", "zero"],
 			reserve_transparent=1,
-			img_pre_colors = "palettes/pal64.png",
-			img_fixed_mask = "palettes/pal64-fixed.png",
-			histogram_file = output_path + "cloudHistogram.npy",
-			palette_output = output_path + "testPalette.png",
+			img_pre_colors = "palettes/pal64.png", #sample_method must include "precolor"
+			img_fixed_mask = "palettes/pal64-fixed.png", #white = fix img_pre_colors, black = movable
 
-			gray_count	= 15,
-			max_colors	= 255,
-			hue_count	= 12,
-			min_sat		= 0.0,
+			histogram_file = os.path.join(output_path, "cloudHistogram.npy"), #relax sim point positions (optional)
+			palette_output = os.path.join(output_path, "testPalette.png"),
+
+			gray_count	= None, #None=Auto, 0=no gray. sample_method must include "gray"
+			max_colors	= 255, #excludes transparency
+			hue_count	= 12, #sort output palette into this many hues
+
+			min_sat		= 0.0, #postprocess palette
 			max_sat		= 1.0,
 			min_lum		= 0.0,
 			max_lum		= 1.0,
 		
-			sample_radius = 1.1,
+			sample_radius = 1.1, #point_sampler target point separation
 			sample_attempts = 1024,
 
-			relax_radius = 1.3,
-			relax_count = 1024,
-			seed = None,
+			relax_radius = 1.3, #simulation target point separation
+			relax_count = 1024, #relax iterations
+			seed = None, #point sampler and relax random seed, None = random
 
-			logging = True
+			logging = 256 #0=disable, 1 enables general logging. Additionally: >1 logs each time this many relax ticks pass.
 		)
 
-	run_PaletteGenerator(preset_pal64)
+	if preset_pal64.valid:
+		PaletteGen.usePreset(preset_pal64)
+	else:
+		print("Invalid preset")

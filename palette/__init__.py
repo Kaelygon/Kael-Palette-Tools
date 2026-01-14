@@ -1,18 +1,21 @@
 """
 kael-palette-tools api
 """
-
+#shared
 from .ArrayRandom import ArrayRandom
-from .OkImage import OkImage
 from .OkLab import OkLab
 from .OkTools import OkTools
-from .OrderedDither import OrderedDither
-from .PaletteGenerator import PaletteGenerator
-from .PalettePreset import PalettePreset
+
+#palettize_image.py
 from .PalettizeImage import PalettizeImage
+from .OkImage import OkImage
+from .OrderedDither import OrderedDither
+
+#palette_generator.py
+from .PaletteGen import PaletteGen
+from .PalettePreset import PalettePreset
 from .ParticleSim import ParticleSim
 from .PointList import PointList
-from .PointListStats import PointListStats
 from .PointSampler import PointSampler
 
 __all__ = [
@@ -21,11 +24,9 @@ __all__ = [
 	"OkLab",
 	"OkTools",
 	"OrderedDither",
-	"PaletteGenerator",
-	"PalettePreset",
+	"PaletteGen",
 	"PalettizeImage",
 	"ParticleSim",
 	"PointList",
-	"PointListStats",
 	"PointSampler",
 ]

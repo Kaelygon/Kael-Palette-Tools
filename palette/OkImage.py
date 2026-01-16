@@ -252,7 +252,7 @@ class OkImage_Filter:
 
 	@staticmethod
 	def ditherNone(image_ok, palette_ok, preset):
-		if not OkImage.Filter._isValidDitherInput(image_ok, palette_ok):
+		if not OkImage.Filter._isValidDitherInput(image_ok, palette_ok, preset):
 			return
 
 		pal_list = palette_ok.unique_list

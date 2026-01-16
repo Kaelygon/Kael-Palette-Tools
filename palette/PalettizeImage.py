@@ -87,21 +87,37 @@ class PalettizeImage:
 	def _createWeightedPalette(
 		unique_list: OkImage.UniqueList,
 		palette_list: OkImage.UniqueList,
-		max_error: float = 1.0,
-		k_count = 13
+		max_error: float,
+
+		dist_w = 3.0, #bucket score weights
+		area_w = 2.0,
+		bias_w = 1.0,
+		eps = 1e-12,
 	):
 		"""
 			Map source image unique colors to palette, but avoid collapsing similar colors
 			Return OkImage.UniqueList
 		"""
+		def calcBucketScore(this_col, pal_col, this_area, axis_bias, bucket_areas, col_dists, max_radius):
+			#score = dist * area * bias, lower=better
+			def scoreNormal(arr, w=1.0): #[0,1]
+				arr_min = arr.min()
+				return w * (arr - arr_min) / (arr.max() - arr_min + eps)
 
-		def calcBucketScore(bucket_areas, col_dists, col_idxs, max_radius):
-			#lower=better, col dists<1.0, bucket_fullness [0,1]
-			area_weight = 10.0 #Arbitrary, bias filled buckets to score worse
-			area_weight = max(area_weight,5.0*max_radius) #Allows high max-error to still have an effect
-			max_bucket = max(1.0, np.max(bucket_areas))
-			area_score = np.maximum(area_weight * bucket_areas[col_idxs]/max_bucket, 1.0)
-			return col_dists * area_score
+			dist_score = scoreNormal(col_dists, w=dist_w)
+			area_norm = scoreNormal(bucket_areas, w=area_w)  #Arbitrary weight to rank filled buckets worse
+			area_score = area_norm
+
+			#prefer colors that cancel out global lab bias,  lower=better
+			#using same area scale as axis_bias (original_color - new_color) * original_area
+			candi_delta = (this_col - pal_col) * this_area
+			#canceling out means lower score = better
+			delta_lab = axis_bias[None,:] + candi_delta
+			color_bias_score = np.sqrt( np.einsum('...i,...i->...', delta_lab, delta_lab) )
+			color_bias_score = scoreNormal(color_bias_score,bias_w)
+
+			return dist_score + area_score + color_bias_score
+
 
 		if unique_list is None:
 			raise Exception("src_img Unique_list missing!")
@@ -109,7 +125,6 @@ class PalettizeImage:
 			raise Exception("palette_img Unique_list missing!")
 
 		pal_length = len(palette_list)
-
 		max_radius = OkTools.approxOkGap(pal_length) * max_error
 
 		#accumulated area of colors in each palette bucket
@@ -117,35 +132,49 @@ class PalettizeImage:
 
 		#Closest palette colors
 		pal_tree = palette_list.tree
-
+		#k = Upper bound how many palette colors within r=max_error
 		packing_density = np.pi / (3.0 * np.sqrt(2.0))
 		search_radius = 1.0 + max_error
-		est_maxk = packing_density * search_radius**3 + 1.0 #How many palette colors within r=max_error
-		k_count = max(2, min(pal_length,est_maxk) )
+		est_maxk = packing_density * search_radius**3 + 1.0 
+		k_count = max(2, min(pal_length, est_maxk) )
 		dists, idxs = pal_tree.query(unique_list.color, k = int(k_count), workers=-1)
 		
 		#choose palette index for each color
-		unique_count = len(unique_list)
 		best_idxs = np.empty(len(unique_list), dtype=int)
+
+		#Global l,a,b bias of new colors, <0 is lower intensity than original
+		axis_bias = np.zeros(3) 
 
 		#prioritize largest area
 		unique_sorted_idx = np.argsort(-1.0*unique_list.area, kind='stable')
 		for i in unique_sorted_idx:
-			#lowest dist and emptiest bucket ; lowest score = better
-			local_scores = calcBucketScore(bucket_areas, dists[i], idxs[i], max_radius)
 			mask = dists[i] <= max_radius
+			neighbor_idxs = idxs[i]
 		
-			if np.any(mask):
+			neighbor_count = np.sum(mask)
+			if neighbor_count>1:
 				valid = np.where(mask)[0]
-				best_pos = valid[np.argmin(local_scores[valid])]
-				best_j = int(idxs[i][best_pos])
+				local_scores = calcBucketScore(
+					unique_list.color[i], 
+					palette_list.color[neighbor_idxs][valid], 
+					unique_list.area[i], 
+					axis_bias, 
+					bucket_areas[neighbor_idxs][valid], 
+					dists[i][valid], 
+					max_radius
+				)
+
+				best_pos = np.argmin(local_scores)
+				best_pal_idx = int(neighbor_idxs[best_pos])
 			else:
 				#choose nearest if exceeds max_error
-				best_pos = 0
-				best_j = int(idxs[i][best_pos])
+				best_pal_idx = int(neighbor_idxs[0])
 		
-			best_idxs[i] = best_j
-			bucket_areas[best_j] += unique_list.area[i]
+			best_idxs[i] = best_pal_idx
+			bucket_areas[best_pal_idx] += unique_list.area[i]
+
+			#bias from area weighted delta, (original_color - new_color) * original_area
+			axis_bias += (unique_list.color[i] - palette_list.color[best_pal_idx]) * unique_list.area[i]
 
 		#UniqueList used as mapping
 		unique_mapping = unique_list.copy()
@@ -223,8 +252,8 @@ class PalettizeImage:
 		#First quantize pass to reduce colors user defined depth
 		if preset.merge_radius:
 			axis_step_size = OkTools.approxOkGap(pal_length) * preset.merge_radius
-			axis_count = int(1.0/axis_step_size)
-			OkImage.Filter.quantizeAxes(palette_ok, step_count=axis_count, axes=[0,1,2])
+			axis_count = max(2, int(1.0/axis_step_size) )
+			OkImage.Filter.quantizeAxes(image_ok, step_count=axis_count, axes=[0,1,2])
 
 		#Apply dither methods
 		if preset.dither in ["bayer", "blue"]:
@@ -241,7 +270,7 @@ class PalettizeImage:
 				OkImage.Filter.applyPalette(image_ok, unique_mapping)
 			else:
 				#choose closest to palette
-				OkImage.Filter.ditherNone(image_ok, palette_ok)
+				OkImage.Filter.ditherNone(image_ok, palette_ok, preset)
 			#dither="none" methods don't affect alpha so we do it here
 			OkImage.Filter.quantizeAxes(image_ok, step_count=preset.alpha_count, axes=[3]) 
 		
